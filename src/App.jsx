@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { storage, CLAVE_RUTINA } from "./storage";
 import { RUTINA_INICIAL } from "./domain/rutina";
+import { leerToken, fetchSesiones, aplicarSesiones } from "./sync/hcAdapter";
 import { progresar, aprender } from "./domain/progression";
 import { hoy } from "./utils/format";
 import { Marco } from "./components/Marco";
@@ -22,9 +23,22 @@ export default function App() {
     (async () => {
       try {
         const r = await storage.get(CLAVE_RUTINA);
-        if (r?.value) setDias(JSON.parse(r.value));
+        if (r?.value) {
+          setDias(JSON.parse(r.value));
+        } else {
+          // Sin datos locales: intentar restaurar desde HC silenciosamente
+          const token = leerToken();
+          if (token) {
+            try {
+              const { sesiones } = await fetchSesiones(token);
+              setDias((prev) => aplicarSesiones(prev, sesiones));
+            } catch (_) {
+              // HC no disponible o token inválido: arranca con rutina por defecto
+            }
+          }
+        }
       } catch (e) {
-        /* primera vez: arranca con la rutina por defecto */
+        /* primera vez */
       }
       setCargando(false);
     })();
@@ -115,6 +129,14 @@ export default function App() {
     }
   };
 
+  const restaurarDesdeHC = async () => {
+    const token = leerToken();
+    if (!token) throw new Error("Sin token");
+    const { sesiones } = await fetchSesiones(token);
+    setDias((prev) => aplicarSesiones(prev, sesiones));
+    return sesiones.length;
+  };
+
   const salirSesion = () => {
     setSesion(null);
     setPantalla("inicio");
@@ -134,7 +156,7 @@ export default function App() {
   }
 
   if (pantalla === "ajustes")
-    return <Ajustes dias={dias} setDias={setDias} volver={() => setPantalla("inicio")} />;
+    return <Ajustes dias={dias} setDias={setDias} restaurarDesdeHC={restaurarDesdeHC} volver={() => setPantalla("inicio")} />;
 
   if (pantalla === "historial")
     return <Progreso dias={dias} volver={() => setPantalla("inicio")} />;

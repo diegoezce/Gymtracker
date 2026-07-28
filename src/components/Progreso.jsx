@@ -67,16 +67,23 @@ function diasDesdeStr(iso) {
 export function Progreso({ dias, volver }) {
   const ahora = new Date();
 
-  const todasFechas = [
-    ...new Set(dias.flatMap((d) => d.ejercicios.flatMap((e) => e.historial.map((h) => h.fecha)))),
+  // Par único (diaId, fecha) = una sesión
+  const todasSesiones = [
+    ...new Set(
+      dias.flatMap((d) => d.ejercicios.flatMap((e) => e.historial.map((h) => `${d.id}::${h.fecha}`)))
+    ),
   ].sort();
 
+  const todasFechas = [...new Set(todasSesiones.map((s) => s.split("::")[1]))].sort();
   const ultimaFecha = todasFechas[todasFechas.length - 1];
 
-  const estasSemana = todasFechas.filter((f) => (ahora - new Date(f)) / 86400000 < 7).length;
+  const estasSemana = todasSesiones.filter((s) => {
+    const f = s.split("::")[1];
+    return (ahora - new Date(f)) / 86400000 < 7;
+  }).length;
 
-  const esteMes = todasFechas.filter((f) => {
-    const d = new Date(f);
+  const esteMes = todasSesiones.filter((s) => {
+    const d = new Date(s.split("::")[1]);
     return d.getMonth() === ahora.getMonth() && d.getFullYear() === ahora.getFullYear();
   }).length;
 
@@ -94,7 +101,7 @@ export function Progreso({ dias, volver }) {
           {[
             { label: "Esta semana", valor: estasSemana },
             { label: "Este mes", valor: esteMes },
-            { label: "Total", valor: todasFechas.length },
+            { label: "Total", valor: todasSesiones.length },
           ].map(({ label, valor }) => (
             <div
               key={label}

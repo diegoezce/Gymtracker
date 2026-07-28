@@ -66,7 +66,7 @@ function TimerDescanso({ segundos, total, onSaltar }) {
   );
 }
 
-export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, salir }) {
+export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, salir, terminar }) {
   const [timerSeg, setTimerSeg] = useState(null);
   const serieNum = sesion.series.length + 1;
   const hayMasSeries = sesion.series.length > 0 && sesion.series.length < ej.series;
@@ -177,9 +177,12 @@ export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, salir }) {
           <Repeticiones objetivo={ej.repsObjetivo} onGuardar={guardarSerie} series={sesion.series} />
         )}
 
-        <div style={{ marginTop: 28 }}>
+        <div style={{ marginTop: 28, display: "flex", flexDirection: "column", gap: 8 }}>
           <Boton tono="fantasma" alto={48} onClick={salir}>
             Volver al menú del día
+          </Boton>
+          <Boton tono="fantasma" alto={44} onClick={terminar} style={{ opacity: 0.5 }}>
+            Terminar sesión
           </Boton>
         </div>
 

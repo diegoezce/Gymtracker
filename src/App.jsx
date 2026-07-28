@@ -173,6 +173,7 @@ export default function App() {
         setSesion={setSesion}
         guardarSerie={guardarSerie}
         salir={volverAlMenu}
+        terminar={salirSesion}
       />
     );
   }

@@ -208,6 +208,19 @@ export function Ajustes({ dias, setDias, restaurarDesdeHC, volver }) {
       )
     );
 
+  const moverEjercicio = (diaOrigenId, ejId, diaDestinoId) => {
+    if (diaOrigenId === diaDestinoId) return;
+    const ej = dias.find((d) => d.id === diaOrigenId)?.ejercicios.find((e) => e.id === ejId);
+    if (!ej) return;
+    setDias(
+      dias.map((d) => {
+        if (d.id === diaOrigenId) return { ...d, ejercicios: d.ejercicios.filter((e) => e.id !== ejId) };
+        if (d.id === diaDestinoId) return { ...d, ejercicios: [...d.ejercicios, ej] };
+        return d;
+      })
+    );
+  };
+
   return (
     <Marco>
       <Cabecera izq="Ajustes" onSalir={volver} />
@@ -268,6 +281,29 @@ export function Ajustes({ dias, setDias, restaurarDesdeHC, volver }) {
                     −
                   </button>
                 </div>
+                {dias.length > 1 && (
+                  <div style={{ marginTop: 6 }}>
+                    <Etiqueta>Mover a</Etiqueta>
+                    <select
+                      value={d.id}
+                      onChange={(ev) => moverEjercicio(d.id, e.id, ev.target.value)}
+                      style={{
+                        ...campo(),
+                        marginTop: 4,
+                        fontFamily: SANS,
+                        fontSize: 14,
+                        appearance: "none",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {dias.map((dx) => (
+                        <option key={dx.id} value={dx.id}>
+                          {dx.nombre}{dx.id === d.id ? " (actual)" : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
                   {[
                     ["peso", "kg"],

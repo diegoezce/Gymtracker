@@ -169,7 +169,7 @@ function SyncPanel({ dias, restaurarDesdeHC }) {
           style={{
             marginTop: 12,
             fontFamily: SANS,
-            fontSize: 14,
+            fontSize: 16,
             color: estado === "error" ? C.oxido : C.verde,
           }}
         >
@@ -228,7 +228,7 @@ export function Ajustes({ dias, setDias, restaurarDesdeHC, volver }) {
         <p
           style={{
             fontFamily: SANS,
-            fontSize: 14,
+            fontSize: 16,
             color: C.gris,
             lineHeight: 1.5,
             margin: "12px 0 24px",
@@ -291,7 +291,7 @@ export function Ajustes({ dias, setDias, restaurarDesdeHC, volver }) {
                         ...campo(),
                         marginTop: 4,
                         fontFamily: SANS,
-                        fontSize: 14,
+                        fontSize: 16,
                         appearance: "none",
                         cursor: "pointer",
                       }}
@@ -336,7 +336,7 @@ export function Ajustes({ dias, setDias, restaurarDesdeHC, volver }) {
                 borderRadius: 4,
                 color: C.gris,
                 fontFamily: SANS,
-                fontSize: 14,
+                fontSize: 16,
                 padding: "12px 0",
                 cursor: "pointer",
                 marginBottom: 8,

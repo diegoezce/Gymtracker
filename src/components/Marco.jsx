@@ -4,7 +4,7 @@ export function Marco({ children }) {
   return (
     <div
       style={{
-        minHeight: "100vh",
+        minHeight: "100dvh",
         background: C.fondo,
         color: C.hueso,
         fontFamily: SANS,
@@ -12,14 +12,20 @@ export function Marco({ children }) {
     >
       <div style={{ maxWidth: 480, margin: "0 auto" }}>{children}</div>
       <style>{`
-        button:focus-visible, input:focus-visible {
+        button:focus-visible, input:focus-visible, select:focus-visible {
           outline: 2px solid ${C.sodio};
           outline-offset: 2px;
         }
-        input { -webkit-appearance: none; }
-        input::-webkit-outer-spin-button, input::-webkit-inner-spin-button {
-          -webkit-appearance: none; margin: 0;
+        input, select, textarea {
+          -webkit-appearance: none;
+          font-size: 16px;
         }
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+        input[type=number] { -moz-appearance: textfield; }
       `}</style>
     </div>
   );

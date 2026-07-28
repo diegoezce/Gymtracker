@@ -240,6 +240,7 @@ export function Ajustes({ dias, setDias, restaurarDesdeHC, volver }) {
                     ["peso", "kg"],
                     ["series", "series"],
                     ["incremento", "salto"],
+                    ["descanso", "desc (s)"],
                   ].map(([k, lab]) => (
                     <div key={k} style={{ flex: 1 }}>
                       <Etiqueta>{lab}</Etiqueta>

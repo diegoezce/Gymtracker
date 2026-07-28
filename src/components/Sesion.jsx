@@ -179,7 +179,7 @@ export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, salir }) {
 
         <div style={{ marginTop: 28 }}>
           <Boton tono="fantasma" alto={48} onClick={salir}>
-            Terminar sesión
+            Volver al menú del día
           </Boton>
         </div>
 

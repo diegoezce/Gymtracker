@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { C, MONO, SANS } from "../theme";
+import { ejercicio as nuevoEjercicio } from "../domain/rutina";
 import { campo } from "../styles/helpers";
 import { Marco } from "./Marco";
 import { Cabecera } from "./Cabecera";
@@ -185,12 +186,25 @@ export function Ajustes({ dias, setDias, restaurarDesdeHC, volver }) {
       dias.map((d) =>
         d.id !== diaId
           ? d
-          : {
-              ...d,
-              ejercicios: d.ejercicios.map((e) =>
-                e.id !== ejId ? e : { ...e, [campoNombre]: valor }
-              ),
-            }
+          : { ...d, ejercicios: d.ejercicios.map((e) => (e.id !== ejId ? e : { ...e, [campoNombre]: valor })) }
+      )
+    );
+
+  const agregarEjercicio = (diaId) =>
+    setDias(
+      dias.map((d) =>
+        d.id !== diaId
+          ? d
+          : { ...d, ejercicios: [...d.ejercicios, nuevoEjercicio("Nuevo ejercicio", 20)] }
+      )
+    );
+
+  const quitarEjercicio = (diaId, ejId) =>
+    setDias(
+      dias.map((d) =>
+        d.id !== diaId
+          ? d
+          : { ...d, ejercicios: d.ejercicios.filter((e) => e.id !== ejId) }
       )
     );
 
@@ -230,11 +244,30 @@ export function Ajustes({ dias, setDias, restaurarDesdeHC, volver }) {
                   marginBottom: 8,
                 }}
               >
-                <input
-                  value={e.nombre}
-                  onChange={(ev) => editar(d.id, e.id, "nombre", ev.target.value)}
-                  style={campo()}
-                />
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <input
+                    value={e.nombre}
+                    onChange={(ev) => editar(d.id, e.id, "nombre", ev.target.value)}
+                    style={{ ...campo(), flex: 1 }}
+                  />
+                  <button
+                    onClick={() => quitarEjercicio(d.id, e.id)}
+                    style={{
+                      background: "none",
+                      border: `1px solid ${C.linea}`,
+                      borderRadius: 4,
+                      color: C.oxido,
+                      fontFamily: MONO,
+                      fontSize: 20,
+                      width: 44,
+                      height: 44,
+                      cursor: "pointer",
+                      flexShrink: 0,
+                    }}
+                  >
+                    −
+                  </button>
+                </div>
                 <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
                   {[
                     ["peso", "kg"],
@@ -258,6 +291,23 @@ export function Ajustes({ dias, setDias, restaurarDesdeHC, volver }) {
                 </div>
               </div>
             ))}
+            <button
+              onClick={() => agregarEjercicio(d.id)}
+              style={{
+                width: "100%",
+                background: "none",
+                border: `1px dashed ${C.linea}`,
+                borderRadius: 4,
+                color: C.gris,
+                fontFamily: SANS,
+                fontSize: 14,
+                padding: "12px 0",
+                cursor: "pointer",
+                marginBottom: 8,
+              }}
+            >
+              + Agregar ejercicio
+            </button>
           </div>
         ))}
 

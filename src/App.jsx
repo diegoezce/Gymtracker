@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { storage, CLAVE_RUTINA } from "./storage";
 import { RUTINA_INICIAL } from "./domain/rutina";
-import { leerToken, fetchSesiones, aplicarSesiones } from "./sync/hcAdapter";
+import { leerToken, fetchSesiones, aplicarSesiones, pushSesiones, construirSesiones } from "./sync/hcAdapter";
 import { progresar, aprender } from "./domain/progression";
 import { hoy } from "./utils/format";
 import { Marco } from "./components/Marco";
@@ -113,6 +113,7 @@ export default function App() {
     );
     setDias(nuevos);
     setAviso(av || nota);
+    syncSilencioso(nuevos);
     const sig = sesion.idx + 1;
     if (sig >= dia.ejercicios.length) {
       setSesion(null);
@@ -138,34 +139,35 @@ export default function App() {
   };
 
   const salirSesion = () => {
-    // Guardar las series del ejercicio en curso aunque estén incompletas
-    if (sesion?.series?.length > 0 && ej) {
-      const { peso, repsObjetivo } = progresar(ej, sesion.series);
-      const { ajustes, incremento } = aprender(ej, sesion.series[0].peso);
-      setDias((prev) =>
-        prev.map((d) =>
-          d.id !== dia.id
-            ? d
-            : {
-                ...d,
-                ejercicios: d.ejercicios.map((e) =>
-                  e.id !== ej.id
-                    ? e
-                    : {
-                        ...e,
-                        peso,
-                        repsObjetivo,
-                        incremento,
-                        ajustes,
-                        historial: [...e.historial, { fecha: hoy(), series: sesion.series }].slice(-40),
-                      }
-                ),
-              }
-        )
+    // Si hay series hechas del ejercicio actual, guardarlas sin tocar la progresión
+    if (sesion?.series?.length > 0 && dia && ej) {
+      const nuevos = dias.map((d) =>
+        d.id !== dia.id
+          ? d
+          : {
+              ...d,
+              ejercicios: d.ejercicios.map((e) =>
+                e.id !== ej.id
+                  ? e
+                  : {
+                      ...e,
+                      historial: [...e.historial, { fecha: hoy(), series: sesion.series }].slice(-40),
+                    }
+              ),
+            }
       );
+      setDias(nuevos);
+      syncSilencioso(nuevos);
     }
     setSesion(null);
     setPantalla("inicio");
+  };
+
+  // Sync silencioso al terminar — no bloquea ni muestra error al usuario
+  const syncSilencioso = (diasActualizados) => {
+    const token = leerToken();
+    if (!token) return;
+    pushSesiones(token, construirSesiones(diasActualizados)).catch(() => {});
   };
 
   if (sesion && ej) {

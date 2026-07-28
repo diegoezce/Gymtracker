@@ -62,6 +62,52 @@ describe("progresar", () => {
   });
 });
 
+describe("progresar con rango (repsMax)", () => {
+  function ejRango(overrides = {}) {
+    return {
+      peso: 60,
+      incremento: 2.5,
+      repsObjetivo: 8,
+      repsMin: 8,
+      repsMax: 10,
+      ajustes: [],
+      historial: [],
+      ...overrides,
+    };
+  }
+
+  it("sube el peso y vuelve a repsMin cuando todas las series alcanzan repsMax", () => {
+    const series = [
+      { peso: 60, reps: 10, rir: 1 },
+      { peso: 60, reps: 10, rir: 1 },
+      { peso: 60, reps: 10, rir: 2 },
+    ];
+    const { peso, repsObjetivo, nota } = progresar(ejRango(), series);
+    expect(peso).toBe(62.5);
+    expect(repsObjetivo).toBe(8);
+    expect(nota).toMatch(/Todas al tope/);
+  });
+
+  it("mantiene el peso si no se alcanza repsMax en todas las series", () => {
+    const series = [
+      { peso: 60, reps: 10, rir: 1 },
+      { peso: 60, reps: 9, rir: 1 },
+    ];
+    const { peso, repsObjetivo } = progresar(ejRango(), series);
+    expect(peso).toBe(60);
+    expect(repsObjetivo).toBe(8);
+  });
+
+  it("baja el peso dos incrementos si la sesión previa también terminó al fallo", () => {
+    const exercise = ejRango({
+      historial: [{ fecha: "2026-07-01", series: [{ peso: 60, reps: 5, rir: 0 }] }],
+    });
+    const { peso, repsObjetivo } = progresar(exercise, [{ peso: 60, reps: 4, rir: 0 }]);
+    expect(peso).toBe(55);
+    expect(repsObjetivo).toBe(8);
+  });
+});
+
 describe("aprender", () => {
   it("no cambia nada si el peso usado coincide con el sugerido", () => {
     const { ajustes, incremento, aviso } = aprender(ej(), 60);

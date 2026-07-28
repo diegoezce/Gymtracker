@@ -1,14 +1,17 @@
 import { fmt } from "../utils/format";
 
 /**
- * La regla: traduce cómo se sintió la última sesión en la carga/objetivo
- * de la próxima.
+ * Progresión basada en rango de reps:
+ * - Si todas las series alcanzan repsMax → subir el mínimo incremento y volver a repsMin.
+ * - Si dos sesiones seguidas al fallo → bajar el peso.
+ * - En cualquier otro caso → repetir el mismo peso.
  *
- * @param {{peso: number, incremento: number, repsObjetivo: number, historial: Array}} ej
+ * Para ejercicios sin repsMax (legado) se mantiene la lógica original basada en RIR.
+ *
+ * @param {{peso: number, incremento: number, repsObjetivo: number, repsMin?: number, repsMax?: number, historial: Array}} ej
  * @param {Array<{peso: number, reps: number, rir: number}>} seriesHechas
  */
 export function progresar(ej, seriesHechas) {
-  const rirFinal = seriesHechas[seriesHechas.length - 1]?.rir ?? 2;
   const inc = ej.incremento;
   let peso = ej.peso;
   let repsObjetivo = ej.repsObjetivo;
@@ -16,19 +19,36 @@ export function progresar(ej, seriesHechas) {
 
   const ultimas = ej.historial.slice(-1)[0];
   const rirPrevio = ultimas?.series?.slice(-1)[0]?.rir;
+  const rirFinal = seriesHechas[seriesHechas.length - 1]?.rir ?? 2;
 
-  if (rirFinal >= 3) {
-    peso = ej.peso + inc;
-    nota = `Sobró margen. Próxima: ${fmt(peso)} kg.`;
-  } else if (rirFinal >= 1) {
-    repsObjetivo = ej.repsObjetivo + 1;
-    nota = `Mismo peso, buscá ${repsObjetivo} reps.`;
-  } else {
-    if (rirPrevio === 0) {
+  if (ej.repsMax != null) {
+    const repsMin = ej.repsMin ?? ej.repsObjetivo;
+    const todasAlTope = seriesHechas.every((s) => s.reps >= ej.repsMax);
+    if (todasAlTope) {
+      peso = ej.peso + inc;
+      repsObjetivo = repsMin;
+      nota = `Todas al tope. Próxima: ${fmt(peso)} kg, volvés a ${repsMin} reps.`;
+    } else if (rirFinal === 0 && rirPrevio === 0) {
       peso = Math.max(inc, ej.peso - inc * 2);
+      repsObjetivo = repsMin;
       nota = `Segunda al fallo seguida. Bajamos a ${fmt(peso)} kg.`;
     } else {
-      nota = `Al fallo. Repetimos ${fmt(peso)} kg.`;
+      nota = `Repetimos ${fmt(peso)} kg.`;
+    }
+  } else {
+    if (rirFinal >= 3) {
+      peso = ej.peso + inc;
+      nota = `Sobró margen. Próxima: ${fmt(peso)} kg.`;
+    } else if (rirFinal >= 1) {
+      repsObjetivo = ej.repsObjetivo + 1;
+      nota = `Mismo peso, buscá ${repsObjetivo} reps.`;
+    } else {
+      if (rirPrevio === 0) {
+        peso = Math.max(inc, ej.peso - inc * 2);
+        nota = `Segunda al fallo seguida. Bajamos a ${fmt(peso)} kg.`;
+      } else {
+        nota = `Al fallo. Repetimos ${fmt(peso)} kg.`;
+      }
     }
   }
   return { peso, repsObjetivo, nota };

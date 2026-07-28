@@ -100,7 +100,7 @@ export function Inicio({ dias, aviso, comenzar, irHistorial, irAjustes }) {
 
         <div style={{ marginTop: 28, display: "flex", gap: 10 }}>
           <Boton tono="fantasma" alto={54} onClick={irHistorial}>
-            Historial
+            Progreso
           </Boton>
           <Boton tono="fantasma" alto={54} onClick={irAjustes}>
             Ajustes

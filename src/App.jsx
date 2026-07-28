@@ -7,7 +7,7 @@ import { Marco } from "./components/Marco";
 import { Inicio } from "./components/Inicio";
 import { Sesion } from "./components/Sesion";
 import { Ajustes } from "./components/Ajustes";
-import { Historial } from "./components/Historial";
+import { Progreso } from "./components/Progreso";
 import { C, MONO } from "./theme";
 
 export default function App() {
@@ -137,7 +137,7 @@ export default function App() {
     return <Ajustes dias={dias} setDias={setDias} volver={() => setPantalla("inicio")} />;
 
   if (pantalla === "historial")
-    return <Historial dias={dias} volver={() => setPantalla("inicio")} />;
+    return <Progreso dias={dias} volver={() => setPantalla("inicio")} />;
 
   return (
     <Inicio

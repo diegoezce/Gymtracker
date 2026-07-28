@@ -53,8 +53,8 @@ export function DiaMenu({ dia, hechos, onEjercicio, onTerminar }) {
         </div>
 
         <div style={{ marginTop: 28 }}>
-          <Boton tono={doneCount > 0 ? "fuerte" : "fantasma"} alto={54} onClick={onTerminar}>
-            {doneCount > 0 ? "Terminar sesión" : "Cancelar"}
+          <Boton tono="fantasma" alto={54} onClick={onTerminar}>
+            Terminar sesión
           </Boton>
         </div>
       </div>

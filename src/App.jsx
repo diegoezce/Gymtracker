@@ -138,6 +138,32 @@ export default function App() {
   };
 
   const salirSesion = () => {
+    // Guardar las series del ejercicio en curso aunque estén incompletas
+    if (sesion?.series?.length > 0 && ej) {
+      const { peso, repsObjetivo } = progresar(ej, sesion.series);
+      const { ajustes, incremento } = aprender(ej, sesion.series[0].peso);
+      setDias((prev) =>
+        prev.map((d) =>
+          d.id !== dia.id
+            ? d
+            : {
+                ...d,
+                ejercicios: d.ejercicios.map((e) =>
+                  e.id !== ej.id
+                    ? e
+                    : {
+                        ...e,
+                        peso,
+                        repsObjetivo,
+                        incremento,
+                        ajustes,
+                        historial: [...e.historial, { fecha: hoy(), series: sesion.series }].slice(-40),
+                      }
+                ),
+              }
+        )
+      );
+    }
     setSesion(null);
     setPantalla("inicio");
   };

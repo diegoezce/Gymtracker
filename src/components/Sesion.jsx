@@ -177,6 +177,12 @@ export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, salir }) {
           <Repeticiones objetivo={ej.repsObjetivo} onGuardar={guardarSerie} series={sesion.series} />
         )}
 
+        <div style={{ marginTop: 28 }}>
+          <Boton tono="fantasma" alto={48} onClick={salir}>
+            Terminar sesión
+          </Boton>
+        </div>
+
         {sesion.series.length > 0 && (
           <div style={{ marginTop: 24 }}>
             <Etiqueta>Series de hoy</Etiqueta>

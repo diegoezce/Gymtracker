@@ -88,14 +88,20 @@ export default function App() {
   // ejIdx null → menú del día; number → ejercicio en curso
 
   const comenzar = (dia) =>
-    setSesion({ diaId: dia.id, ejIdx: null, pesoActual: 0, series: [], hechos: {} });
+    setSesion({ diaId: dia.id, ejIdx: null, pesoActual: 0, series: [], hechos: {}, progreso: {} });
 
   const dia = sesion ? dias.find((d) => d.id === sesion.diaId) : null;
   const ej = dia && sesion.ejIdx !== null ? dia.ejercicios[sesion.ejIdx] : null;
 
   const iniciarEjercicio = (idx) => {
     const e = dia.ejercicios[idx];
-    setSesion({ ...sesion, ejIdx: idx, series: [], pesoActual: e.tipo === "cardio" ? 0 : e.peso });
+    const guardado = sesion.progreso?.[e.id];
+    setSesion({
+      ...sesion,
+      ejIdx: idx,
+      series: guardado?.series ?? [],
+      pesoActual: guardado?.pesoActual ?? (e.tipo === "cardio" ? 0 : e.peso),
+    });
   };
 
   const guardarCardio = (duracion, distancia) => {
@@ -146,34 +152,38 @@ export default function App() {
     setSesion({ ...sesion, ejIdx: null, series: [], hechos: { ...sesion.hechos, [ej.id]: true } });
   };
 
-  const guardarParcialSiHay = () => {
-    if (sesion?.series?.length > 0 && dia && ej && ej.tipo !== "cardio") {
-      const nuevos = dias.map((d) =>
-        d.id !== dia.id
-          ? d
-          : {
-              ...d,
-              ejercicios: d.ejercicios.map((e) =>
-                e.id !== ej.id
-                  ? e
-                  : { ...e, historial: [...e.historial, { fecha: hoy(), series: sesion.series }].slice(-40) }
-              ),
-            }
-      );
+  // Construye el progreso actualizado con las series del ejercicio en curso (si las hay)
+  const progresoActual = () => {
+    if (sesion.series.length > 0 && ej && ej.tipo !== "cardio") {
+      return { ...sesion.progreso, [ej.id]: { series: sesion.series, pesoActual: sesion.pesoActual } };
+    }
+    return sesion.progreso ?? {};
+  };
+
+  // Vuelve al menú: guarda las series parciales en sesion.progreso (en memoria, no en historial)
+  const volverAlMenu = () => {
+    setSesion({ ...sesion, ejIdx: null, series: [], progreso: progresoActual() });
+  };
+
+  // Sale de la sesión: vuelca todo el progreso parcial al historial
+  const salirSesion = () => {
+    const progreso = progresoActual();
+    const hayParciales = Object.values(progreso).some((p) => p.series.length > 0);
+    if (hayParciales) {
+      const nuevos = dias.map((d) => {
+        if (d.id !== sesion.diaId) return d;
+        return {
+          ...d,
+          ejercicios: d.ejercicios.map((e) => {
+            const p = progreso[e.id];
+            if (!p || p.series.length === 0) return e;
+            return { ...e, historial: [...e.historial, { fecha: hoy(), series: p.series }].slice(-40) };
+          }),
+        };
+      });
       setDias(nuevos);
       syncSilencioso(nuevos);
     }
-  };
-
-  // Vuelve al menú del día guardando las series parciales del ejercicio en curso
-  const volverAlMenu = () => {
-    guardarParcialSiHay();
-    setSesion({ ...sesion, ejIdx: null, series: [] });
-  };
-
-  // Sale de la sesión completamente
-  const salirSesion = () => {
-    guardarParcialSiHay();
     setSesion(null);
     setPantalla("inicio");
   };
@@ -191,6 +201,7 @@ export default function App() {
       <DiaMenu
         dia={dia}
         hechos={sesion.hechos}
+        progreso={sesion.progreso ?? {}}
         onEjercicio={iniciarEjercicio}
         onTerminar={salirSesion}
       />

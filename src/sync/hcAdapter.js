@@ -3,7 +3,7 @@ const HC_URL = "https://hc.sparkio.me";
 export const TOKEN_KEY = "gym:hc:token";
 export const SYNC_KEY = "gym:hc:ultima-sync";
 export const AUTOSYNC_KEY = "gym:hc:autosync";
-export const leerAutoSync = () => localStorage.getItem(AUTOSYNC_KEY) !== "0";
+export const leerAutoSync = () => localStorage.getItem(AUTOSYNC_KEY) === "1";
 
 export function leerToken() {
   return localStorage.getItem(TOKEN_KEY);

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { storage, CLAVE_RUTINA } from "./storage";
 import { RUTINA_INICIAL } from "./domain/rutina";
-import { leerToken, fetchSesiones, aplicarSesiones, pushSesiones, construirSesiones, pushRutina, fetchRutina, aplicarRutina } from "./sync/hcAdapter";
+import { leerToken, leerAutoSync, fetchSesiones, aplicarSesiones, pushSesiones, construirSesiones, pushRutina, fetchRutina, aplicarRutina } from "./sync/hcAdapter";
 import { progresar, aprender } from "./domain/progression";
 import { hoy } from "./utils/format";
 import { Marco } from "./components/Marco";
@@ -74,13 +74,13 @@ export default function App() {
 
   const syncSilencioso = (diasActualizados) => {
     const token = leerToken();
-    if (!token) return;
+    if (!token || !leerAutoSync()) return;
     pushSesiones(token, construirSesiones(diasActualizados)).catch(() => {});
   };
 
   const syncRutinaSilenciosa = (diasActualizados) => {
     const token = leerToken();
-    if (!token) return;
+    if (!token || !leerAutoSync()) return;
     pushRutina(token, diasActualizados).catch(() => {});
   };
 

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { storage, CLAVE_RUTINA } from "./storage";
 import { RUTINA_INICIAL } from "./domain/rutina";
-import { leerToken, fetchSesiones, aplicarSesiones, pushSesiones, construirSesiones } from "./sync/hcAdapter";
+import { leerToken, fetchSesiones, aplicarSesiones, pushSesiones, construirSesiones, pushRutina, fetchRutina, aplicarRutina } from "./sync/hcAdapter";
 import { progresar, aprender } from "./domain/progression";
 import { hoy } from "./utils/format";
 import { Marco } from "./components/Marco";
@@ -27,11 +27,19 @@ export default function App() {
         if (r?.value) {
           setDias(JSON.parse(r.value));
         } else {
+          // Sin datos locales: restaurar rutina + historial desde HC
           const token = leerToken();
           if (token) {
             try {
-              const { sesiones } = await fetchSesiones(token);
-              setDias((prev) => aplicarSesiones(prev, sesiones));
+              const [{ rutina }, { sesiones }] = await Promise.all([
+                fetchRutina(token),
+                fetchSesiones(token),
+              ]);
+              if (rutina) {
+                setDias((prev) => aplicarSesiones(aplicarRutina(rutina, prev), sesiones));
+              } else {
+                setDias((prev) => aplicarSesiones(prev, sesiones));
+              }
             } catch (_) {}
           }
         }
@@ -68,6 +76,12 @@ export default function App() {
     const token = leerToken();
     if (!token) return;
     pushSesiones(token, construirSesiones(diasActualizados)).catch(() => {});
+  };
+
+  const syncRutinaSilenciosa = (diasActualizados) => {
+    const token = leerToken();
+    if (!token) return;
+    pushRutina(token, diasActualizados).catch(() => {});
   };
 
   // sesion = { diaId, ejIdx: null | number, pesoActual, series, hechos }
@@ -179,7 +193,7 @@ export default function App() {
   }
 
   if (pantalla === "ajustes")
-    return <Ajustes dias={dias} setDias={setDias} restaurarDesdeHC={restaurarDesdeHC} volver={() => setPantalla("inicio")} />;
+    return <Ajustes dias={dias} setDias={setDias} restaurarDesdeHC={restaurarDesdeHC} volver={() => { syncRutinaSilenciosa(dias); setPantalla("inicio"); }} />;
 
   if (pantalla === "historial")
     return <Progreso dias={dias} volver={() => setPantalla("inicio")} />;

@@ -62,6 +62,48 @@ export function aplicarSesiones(dias, sesiones) {
   }));
 }
 
+// Elimina el historial de cada ejercicio — solo la estructura de la rutina
+function extraerEstructura(dias) {
+  return dias.map((dia) => ({
+    ...dia,
+    ejercicios: dia.ejercicios.map(({ historial: _h, ...ej }) => ej),
+  }));
+}
+
+export async function pushRutina(token, dias) {
+  const res = await fetch(`${HC_URL}/api/gymtracker/rutina/`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Authorization: `Token ${token}` },
+    body: JSON.stringify({ rutina: extraerEstructura(dias) }),
+  });
+  if (res.status === 401) throw new Error("401");
+  if (!res.ok) throw new Error(`Error ${res.status}`);
+  return res.json();
+}
+
+export async function fetchRutina(token) {
+  const res = await fetch(`${HC_URL}/api/gymtracker/rutina/`, {
+    headers: { Authorization: `Token ${token}` },
+  });
+  if (res.status === 401) throw new Error("401");
+  if (!res.ok) throw new Error(`Error ${res.status}`);
+  return res.json(); // { rutina: [...] | null }
+}
+
+// Combina la estructura del HC con el historial local (si existe)
+export function aplicarRutina(rutinaHC, diasLocales) {
+  return rutinaHC.map((diaHC) => {
+    const diaLocal = diasLocales.find((d) => d.id === diaHC.id);
+    return {
+      ...diaHC,
+      ejercicios: diaHC.ejercicios.map((ejHC) => {
+        const ejLocal = diaLocal?.ejercicios.find((e) => e.id === ejHC.id);
+        return { ...ejHC, historial: ejLocal?.historial ?? [] };
+      }),
+    };
+  });
+}
+
 export function construirSesiones(dias) {
   const sesiones = [];
   dias.forEach((dia) => {

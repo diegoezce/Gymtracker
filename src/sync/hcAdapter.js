@@ -48,8 +48,18 @@ export function aplicarSesiones(dias, sesiones) {
   return dias.map((dia) => ({
     ...dia,
     ejercicios: dia.ejercicios.map((ej) => {
-      const historial = sesiones
-        .filter((s) => s.dia === dia.nombre)
+      const sesionesDelDia = sesiones.filter((s) => s.dia === dia.nombre);
+      if (ej.tipo === "cardio") {
+        const historial = sesionesDelDia
+          .flatMap((s) => {
+            const ejHC = s.ejercicios.find((e) => e.nombre === ej.nombre);
+            return ejHC ? [{ fecha: s.fecha, duracion: ejHC.duracion, distancia: ejHC.distancia }] : [];
+          })
+          .sort((a, b) => a.fecha.localeCompare(b.fecha))
+          .slice(-40);
+        return { ...ej, historial };
+      }
+      const historial = sesionesDelDia
         .flatMap((s) => {
           const ejHC = s.ejercicios.find((e) => e.nombre === ej.nombre);
           return ejHC ? [{ fecha: s.fecha, series: ejHC.series }] : [];
@@ -116,14 +126,21 @@ export function construirSesiones(dias) {
       const ejercicios = dia.ejercicios
         .map((e) => {
           const entrada = e.historial.find((h) => h.fecha === fecha);
-          return entrada ? { nombre: e.nombre, series: entrada.series } : null;
+          if (!entrada) return null;
+          if (e.tipo === "cardio") {
+            return { nombre: e.nombre, tipo: "cardio", duracion: entrada.duracion, distancia: entrada.distancia, series: [] };
+          }
+          return { nombre: e.nombre, series: entrada.series };
         })
         .filter(Boolean);
       const volumen_kg = ejercicios.reduce(
-        (sum, e) => sum + e.series.reduce((s, serie) => s + serie.peso * serie.reps, 0),
+        (sum, e) => sum + (e.series?.reduce((s, serie) => s + serie.peso * serie.reps, 0) ?? 0),
         0
       );
-      sesiones.push({ fecha, dia: dia.nombre, ejercicios, volumen_kg, duracion_min: null });
+      const duracion_min = ejercicios
+        .filter((e) => e.tipo === "cardio")
+        .reduce((sum, e) => sum + (e.duracion ?? 0), 0) || null;
+      sesiones.push({ fecha, dia: dia.nombre, ejercicios, volumen_kg, duracion_min });
     });
   });
   return sesiones.sort((a, b) => a.fecha.localeCompare(b.fecha));

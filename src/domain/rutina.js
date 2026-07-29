@@ -1,6 +1,10 @@
+const genId = (nombre) =>
+  nombre.toLowerCase().replace(/[^a-z0-9]/g, "") + Math.random().toString(36).slice(2, 6);
+
 // repsMin/repsMax definen el rango; repsObjetivo arranca en repsMin y sube con la carga
 export const ejercicio = (nombre, peso, incremento = 2.5, series = 3, repsMin = 8, repsMax = null, descanso = 90) => ({
-  id: nombre.toLowerCase().replace(/[^a-z0-9]/g, "") + Math.random().toString(36).slice(2, 6),
+  id: genId(nombre),
+  tipo: "fuerza",
   nombre,
   peso,
   incremento,
@@ -10,6 +14,16 @@ export const ejercicio = (nombre, peso, incremento = 2.5, series = 3, repsMin = 
   repsObjetivo: repsMin,
   descanso,
   ajustes: [],
+  historial: [],
+});
+
+// historial: [{ fecha, duracion, distancia }]
+export const ejercicioCardio = (nombre, duracionMin = 30, distanciaKm = null) => ({
+  id: genId(nombre),
+  tipo: "cardio",
+  nombre,
+  duracionMin,
+  distanciaKm,
   historial: [],
 });
 

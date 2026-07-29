@@ -93,8 +93,27 @@ export default function App() {
   const dia = sesion ? dias.find((d) => d.id === sesion.diaId) : null;
   const ej = dia && sesion.ejIdx !== null ? dia.ejercicios[sesion.ejIdx] : null;
 
-  const iniciarEjercicio = (idx) =>
-    setSesion({ ...sesion, ejIdx: idx, series: [], pesoActual: dia.ejercicios[idx].peso });
+  const iniciarEjercicio = (idx) => {
+    const e = dia.ejercicios[idx];
+    setSesion({ ...sesion, ejIdx: idx, series: [], pesoActual: e.tipo === "cardio" ? 0 : e.peso });
+  };
+
+  const guardarCardio = (duracion, distancia) => {
+    const nuevos = dias.map((d) =>
+      d.id !== dia.id ? d : {
+        ...d,
+        ejercicios: d.ejercicios.map((e) =>
+          e.id !== ej.id ? e : {
+            ...e,
+            historial: [...e.historial, { fecha: hoy(), duracion, distancia }].slice(-40),
+          }
+        ),
+      }
+    );
+    setDias(nuevos);
+    syncSilencioso(nuevos);
+    setSesion({ ...sesion, ejIdx: null, series: [], hechos: { ...sesion.hechos, [ej.id]: true } });
+  };
 
   const guardarSerie = (reps, rir) => {
     const series = [...sesion.series, { peso: sesion.pesoActual, reps, rir }];
@@ -128,7 +147,7 @@ export default function App() {
   };
 
   const guardarParcialSiHay = () => {
-    if (sesion?.series?.length > 0 && dia && ej) {
+    if (sesion?.series?.length > 0 && dia && ej && ej.tipo !== "cardio") {
       const nuevos = dias.map((d) =>
         d.id !== dia.id
           ? d
@@ -186,6 +205,7 @@ export default function App() {
         sesion={sesion}
         setSesion={setSesion}
         guardarSerie={guardarSerie}
+        guardarCardio={guardarCardio}
         salir={volverAlMenu}
         terminar={salirSesion}
       />

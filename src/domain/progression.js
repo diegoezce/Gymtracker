@@ -12,6 +12,7 @@ import { fmt } from "../utils/format";
  * @param {Array<{peso: number, reps: number, rir: number}>} seriesHechas
  */
 export function progresar(ej, seriesHechas) {
+  if (ej.tipo === "cardio") return { peso: 0, repsObjetivo: 0, nota: "" };
   const inc = ej.incremento;
   let peso = ej.peso;
   let repsObjetivo = ej.repsObjetivo;
@@ -62,6 +63,7 @@ export function progresar(ej, seriesHechas) {
  * @param {number} pesoUsado
  */
 export function aprender(ej, pesoUsado) {
+  if (ej.tipo === "cardio") return { ajustes: [], incremento: 0, aviso: "" };
   const delta = pesoUsado - ej.peso;
   if (Math.abs(delta) < 0.01) return { ajustes: [], incremento: ej.incremento, aviso: "" };
   const ajustes = [...(ej.ajustes || []), Math.sign(delta)].slice(-3);

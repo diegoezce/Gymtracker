@@ -37,6 +37,10 @@ export function DiaMenu({ dia, hechos, onEjercicio, onTerminar }) {
                   </span>
                   {hecho ? (
                     <span style={{ fontFamily: MONO, fontSize: 13, color: C.verde }}>✓</span>
+                  ) : e.tipo === "cardio" ? (
+                    <span style={{ fontFamily: MONO, fontSize: 13, color: C.gris }}>
+                      {e.duracionMin} min
+                    </span>
                   ) : (
                     <span style={{ fontFamily: MONO, fontSize: 13, color: C.gris }}>
                       {fmt(e.peso)} kg
@@ -44,8 +48,9 @@ export function DiaMenu({ dia, hechos, onEjercicio, onTerminar }) {
                   )}
                 </div>
                 <div style={{ fontFamily: MONO, fontSize: 12, color: C.gris, marginTop: 4 }}>
-                  {e.series} × {e.repsMax ? `${e.repsMin}–${e.repsMax}` : e.repsObjetivo} reps
-                  {e.descanso ? ` · ${e.descanso}s` : ""}
+                  {e.tipo === "cardio"
+                    ? `Cardio${e.distanciaKm ? ` · ${e.distanciaKm} km` : ""}`
+                    : `${e.series} × ${e.repsMax ? `${e.repsMin}–${e.repsMax}` : e.repsObjetivo} reps${e.descanso ? ` · ${e.descanso}s` : ""}`}
                 </div>
               </button>
             );

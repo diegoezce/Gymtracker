@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { C, MONO, SANS } from "../theme";
-import { ejercicio as nuevoEjercicio } from "../domain/rutina";
+import { ejercicio as nuevoEjercicio, ejercicioCardio as nuevoCardio } from "../domain/rutina";
 import { Marco } from "./Marco";
 import { Cabecera } from "./Cabecera";
 import { Boton } from "./Boton";
@@ -109,48 +109,88 @@ function Toggle({ activo, onChange }) {
 
 /* ── tarjeta de ejercicio ── */
 
-function TarjetaEjercicio({ ej, diaId, dias, onEditar, onQuitar, onMover }) {
+const QUITAR_BTN = {
+  background: "none",
+  border: `1px solid #3a2a2a`,
+  borderRadius: 4,
+  color: "#c0392b",
+  fontFamily: "ui-monospace, monospace",
+  fontSize: 18,
+  width: 36,
+  height: 36,
+  cursor: "pointer",
+  flexShrink: 0,
+  lineHeight: 1,
+};
+
+function CabeceraCard({ ej, diaId, onEditar, onQuitar }) {
+  const e = (campo, valor) => onEditar(diaId, ej.id, campo, valor);
+  return (
+    <div style={{ padding: "14px 14px 10px", display: "flex", gap: 10, alignItems: "center" }}>
+      <div style={{ flex: 1 }}>
+        <TextInput value={ej.nombre} onChange={(v) => e("nombre", v)} placeholder="Nombre del ejercicio" />
+      </div>
+      {ej.tipo === "cardio" && (
+        <span style={{ fontFamily: SANS, fontSize: 11, color: C.sodio, background: "#1a2a1a", borderRadius: 3, padding: "2px 6px", flexShrink: 0 }}>
+          CARDIO
+        </span>
+      )}
+      <button onClick={() => onQuitar(diaId, ej.id)} style={QUITAR_BTN}>×</button>
+    </div>
+  );
+}
+
+function TarjetaCardio({ ej, diaId, dias, onEditar, onQuitar, onMover }) {
   const [abierto, setAbierto] = useState(false);
   const e = (campo, valor) => onEditar(diaId, ej.id, campo, valor);
 
   return (
-    <div
-      style={{
-        background: C.sup,
-        border: `1px solid ${C.linea}`,
-        borderRadius: 6,
-        marginBottom: 8,
-        overflow: "hidden",
-      }}
-    >
-      {/* cabecera de la tarjeta */}
-      <div style={{ padding: "14px 14px 10px", display: "flex", gap: 10, alignItems: "center" }}>
-        <div style={{ flex: 1 }}>
-          <TextInput
-            value={ej.nombre}
-            onChange={(v) => e("nombre", v)}
-            placeholder="Nombre del ejercicio"
-          />
+    <div style={{ background: C.sup, border: `1px solid ${C.linea}`, borderRadius: 6, marginBottom: 8, overflow: "hidden" }}>
+      <CabeceraCard ej={ej} diaId={diaId} onEditar={onEditar} onQuitar={onQuitar} />
+
+      <div style={{ padding: "0 14px 12px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        <div>
+          <Label>Duración objetivo (min)</Label>
+          <NumInput value={ej.duracionMin} onChange={(v) => e("duracionMin", v)} step={5} min={1} />
         </div>
-        <button
-          onClick={() => onQuitar(diaId, ej.id)}
-          style={{
-            background: "none",
-            border: `1px solid ${C.linea}`,
-            borderRadius: 4,
-            color: C.oxido,
-            fontFamily: MONO,
-            fontSize: 18,
-            width: 36,
-            height: 36,
-            cursor: "pointer",
-            flexShrink: 0,
-            lineHeight: 1,
-          }}
-        >
-          ×
-        </button>
+        <div>
+          <Label>Distancia objetivo (km)</Label>
+          <NumInput value={ej.distanciaKm ?? 0} onChange={(v) => e("distanciaKm", v === 0 ? null : v)} step={0.5} />
+        </div>
       </div>
+
+      {dias.length > 1 && (
+        <>
+          <button
+            onClick={() => setAbierto((a) => !a)}
+            style={{ width: "100%", background: "none", border: "none", borderTop: `1px solid ${C.linea}`, color: C.gris, fontFamily: SANS, fontSize: 12, padding: "8px 14px", cursor: "pointer", textAlign: "left", display: "flex", justifyContent: "space-between" }}
+          >
+            <span>Mover a otro día</span>
+            <span>{abierto ? "▲" : "▼"}</span>
+          </button>
+          {abierto && (
+            <div style={{ padding: "10px 14px 14px", borderTop: `1px solid ${C.linea}`, display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {dias.filter((d) => d.id !== diaId).map((d) => (
+                <button key={d.id} onClick={() => onMover(diaId, ej.id, d.id)}
+                  style={{ background: "none", border: `1px solid ${C.linea}`, borderRadius: 4, color: C.gris, fontFamily: SANS, fontSize: 13, padding: "6px 12px", cursor: "pointer" }}>
+                  → {d.nombre}
+                </button>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function TarjetaFuerza({ ej, diaId, dias, onEditar, onQuitar, onMover }) {
+  const [abierto, setAbierto] = useState(false);
+  const e = (campo, valor) => onEditar(diaId, ej.id, campo, valor);
+
+  return (
+    <div style={{ background: C.sup, border: `1px solid ${C.linea}`, borderRadius: 6, marginBottom: 8, overflow: "hidden" }}>
+      <CabeceraCard ej={ej} diaId={diaId} onEditar={onEditar} onQuitar={onQuitar} />
 
       {/* fila principal: series · reps · descanso */}
       <div style={{ padding: "0 14px 12px", display: "grid", gridTemplateColumns: "1fr 2fr 1fr", gap: 8 }}>
@@ -175,20 +215,7 @@ function TarjetaEjercicio({ ej, diaId, dias, onEditar, onQuitar, onMover }) {
       {/* avanzado (colapsable) */}
       <button
         onClick={() => setAbierto((a) => !a)}
-        style={{
-          width: "100%",
-          background: "none",
-          border: "none",
-          borderTop: `1px solid ${C.linea}`,
-          color: C.gris,
-          fontFamily: SANS,
-          fontSize: 12,
-          padding: "8px 14px",
-          cursor: "pointer",
-          textAlign: "left",
-          display: "flex",
-          justifyContent: "space-between",
-        }}
+        style={{ width: "100%", background: "none", border: "none", borderTop: `1px solid ${C.linea}`, color: C.gris, fontFamily: SANS, fontSize: 12, padding: "8px 14px", cursor: "pointer", textAlign: "left", display: "flex", justifyContent: "space-between" }}
       >
         <span>Peso inicial · incremento{dias.length > 1 ? " · mover" : ""}</span>
         <span>{abierto ? "▲" : "▼"}</span>
@@ -217,16 +244,7 @@ function TarjetaEjercicio({ ej, diaId, dias, onEditar, onQuitar, onMover }) {
                     <button
                       key={d.id}
                       onClick={() => onMover(diaId, ej.id, d.id)}
-                      style={{
-                        background: "none",
-                        border: `1px solid ${C.linea}`,
-                        borderRadius: 4,
-                        color: C.gris,
-                        fontFamily: SANS,
-                        fontSize: 13,
-                        padding: "6px 12px",
-                        cursor: "pointer",
-                      }}
+                      style={{ background: "none", border: `1px solid ${C.linea}`, borderRadius: 4, color: C.gris, fontFamily: SANS, fontSize: 13, padding: "6px 12px", cursor: "pointer" }}
                     >
                       → {d.nombre}
                     </button>
@@ -238,6 +256,12 @@ function TarjetaEjercicio({ ej, diaId, dias, onEditar, onQuitar, onMover }) {
       )}
     </div>
   );
+}
+
+function TarjetaEjercicio(props) {
+  return props.ej.tipo === "cardio"
+    ? <TarjetaCardio {...props} />
+    : <TarjetaFuerza {...props} />;
 }
 
 /* ── panel de sync ── */
@@ -382,6 +406,11 @@ export function Ajustes({ dias, setDias, restaurarDesdeHC, volver }) {
       d.id !== diaId ? d : { ...d, ejercicios: [...d.ejercicios, nuevoEjercicio("Nuevo ejercicio", 20, 2.5, 3, 8, 12, 90)] }
     ));
 
+  const agregarCardio = (diaId) =>
+    setDias(dias.map((d) =>
+      d.id !== diaId ? d : { ...d, ejercicios: [...d.ejercicios, nuevoCardio("Cardio", 30, null)] }
+    ));
+
   const quitarEjercicio = (diaId, ejId) =>
     setDias(dias.map((d) =>
       d.id !== diaId ? d : { ...d, ejercicios: d.ejercicios.filter((e) => e.id !== ejId) }
@@ -436,22 +465,20 @@ export function Ajustes({ dias, setDias, restaurarDesdeHC, volver }) {
               />
             ))}
 
-            <button
-              onClick={() => agregarEjercicio(d.id)}
-              style={{
-                width: "100%",
-                background: "none",
-                border: `1px dashed ${C.linea}`,
-                borderRadius: 6,
-                color: C.gris,
-                fontFamily: SANS,
-                fontSize: 15,
-                padding: "13px 0",
-                cursor: "pointer",
-              }}
-            >
-              + Agregar ejercicio
-            </button>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                onClick={() => agregarEjercicio(d.id)}
+                style={{ flex: 1, background: "none", border: `1px dashed ${C.linea}`, borderRadius: 6, color: C.gris, fontFamily: SANS, fontSize: 14, padding: "13px 0", cursor: "pointer" }}
+              >
+                + Fuerza
+              </button>
+              <button
+                onClick={() => agregarCardio(d.id)}
+                style={{ flex: 1, background: "none", border: `1px dashed ${C.linea}`, borderRadius: 6, color: C.gris, fontFamily: SANS, fontSize: 14, padding: "13px 0", cursor: "pointer" }}
+              >
+                + Cardio
+              </button>
+            </div>
           </div>
         ))}
 

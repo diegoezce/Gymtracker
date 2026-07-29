@@ -152,23 +152,26 @@ export default function App() {
     setSesion({ ...sesion, ejIdx: null, series: [], hechos: { ...sesion.hechos, [ej.id]: true } });
   };
 
-  // Construye el progreso actualizado con las series del ejercicio en curso (si las hay)
-  const progresoActual = () => {
-    if (sesion.series.length > 0 && ej && ej.tipo !== "cardio") {
-      return { ...sesion.progreso, [ej.id]: { series: sesion.series, pesoActual: sesion.pesoActual } };
+  // Vuelve al menú: guarda series parciales + timerFin en sesion.progreso (no en historial)
+  const volverAlMenu = (timerFinActual = null) => {
+    const nuevoProg = { ...sesion.progreso };
+    if (ej && ej.tipo !== "cardio") {
+      nuevoProg[ej.id] = {
+        series: sesion.series,
+        pesoActual: sesion.pesoActual,
+        timerFin: timerFinActual && timerFinActual > Date.now() ? timerFinActual : null,
+      };
     }
-    return sesion.progreso ?? {};
-  };
-
-  // Vuelve al menú: guarda las series parciales en sesion.progreso (en memoria, no en historial)
-  const volverAlMenu = () => {
-    setSesion({ ...sesion, ejIdx: null, series: [], progreso: progresoActual() });
+    setSesion({ ...sesion, ejIdx: null, series: [], progreso: nuevoProg });
   };
 
   // Sale de la sesión: vuelca todo el progreso parcial al historial
   const salirSesion = () => {
-    const progreso = progresoActual();
-    const hayParciales = Object.values(progreso).some((p) => p.series.length > 0);
+    const progreso = { ...sesion.progreso };
+    if (ej && ej.tipo !== "cardio" && sesion.series.length > 0) {
+      progreso[ej.id] = { series: sesion.series, pesoActual: sesion.pesoActual };
+    }
+    const hayParciales = Object.values(progreso).some((p) => p.series?.length > 0);
     if (hayParciales) {
       const nuevos = dias.map((d) => {
         if (d.id !== sesion.diaId) return d;
@@ -176,7 +179,7 @@ export default function App() {
           ...d,
           ejercicios: d.ejercicios.map((e) => {
             const p = progreso[e.id];
-            if (!p || p.series.length === 0) return e;
+            if (!p || !p.series?.length) return e;
             return { ...e, historial: [...e.historial, { fecha: hoy(), series: p.series }].slice(-40) };
           }),
         };
@@ -217,6 +220,7 @@ export default function App() {
         setSesion={setSesion}
         guardarSerie={guardarSerie}
         guardarCardio={guardarCardio}
+        initialTimerFin={sesion.progreso?.[ej.id]?.timerFin ?? null}
         salir={volverAlMenu}
         terminar={salirSesion}
       />

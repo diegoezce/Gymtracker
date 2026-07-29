@@ -156,17 +156,30 @@ function SesionCardio({ ej, guardarCardio, salir, terminar }) {
 
 /* ── sesión principal ── */
 
-export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarCardio, salir, terminar }) {
-  // Timestamp-based timer: more reliable than countdown-by-1 when tab is backgrounded.
-  // timerFin = absolute ms when rest ends; timerSeg = display value recalculated from Date.now().
-  const [timerFin, setTimerFin] = useState(null);
-  const [timerSeg, setTimerSeg] = useState(null);
-  const prevSeg = useRef(null);
+export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarCardio, initialTimerFin = null, salir, terminar }) {
+  // Restore timer from saved state if returning to an exercise mid-session
+  const validoInicial = initialTimerFin && initialTimerFin > Date.now() ? initialTimerFin : null;
+  const [timerFin, setTimerFin] = useState(validoInicial);
+  const [timerSeg, setTimerSeg] = useState(
+    validoInicial ? Math.max(0, Math.ceil((validoInicial - Date.now()) / 1000)) : null
+  );
+  const prevSeg = useRef(timerSeg);
+  // Skip the timer-start effect on mount so a restored timer isn't overwritten
+  const mountHandled = useRef(false);
 
   const hayMasSeries = sesion.series.length > 0 && sesion.series.length < ej.series;
 
-  // Start/stop timer when series count changes
+  // Re-schedule SW notification when mounting with a restored timer
   useEffect(() => {
+    if (timerFin) programarNotificacion(timerFin);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Start/stop timer when series count changes (skip on initial mount)
+  useEffect(() => {
+    if (!mountHandled.current) {
+      mountHandled.current = true;
+      return; // don't overwrite restored timer on mount
+    }
     if (hayMasSeries && ej.descanso) {
       const fin = Date.now() + ej.descanso * 1000;
       setTimerFin(fin);
@@ -200,14 +213,6 @@ export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarCardio
     const id = setInterval(tick, 500);
     return () => clearInterval(id);
   }, [timerFin]);
-
-  // Reset timer when switching exercise
-  useEffect(() => {
-    cancelarNotificacion();
-    setTimerFin(null);
-    setTimerSeg(null);
-    prevSeg.current = null;
-  }, [ej.id]);
 
   const saltarTimer = () => {
     cancelarNotificacion();
@@ -262,8 +267,8 @@ export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarCardio
           )}
 
           <div style={{ marginTop: 28, display: "flex", flexDirection: "column", gap: 8 }}>
-            <Boton tono="fantasma" alto={48} onClick={salir}>Volver al menú del día</Boton>
-            <Boton tono="fantasma" alto={44} onClick={terminar} style={{ opacity: 0.5 }}>Terminar sesión</Boton>
+            <Boton tono="fantasma" alto={48} onClick={() => salir(timerFin)}>Volver al menú del día</Boton>
+            <Boton tono="fantasma" alto={44} onClick={() => { cancelarNotificacion(); terminar(); }} style={{ opacity: 0.5 }}>Terminar sesión</Boton>
           </div>
 
           {sesion.series.length > 0 && (

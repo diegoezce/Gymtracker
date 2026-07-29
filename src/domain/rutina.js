@@ -38,6 +38,7 @@ export const RUTINA_INICIAL = [
       ejercicio("Curl femoral sentado",             35, 5,   3, 10, 12,  90),
       ejercicio("Elevaciones laterales",            10, 2,   3, 12, 15,  60),
       ejercicio("Extensión tríceps en polea",       18, 2.5, 3, 10, 12,  60),
+      ejercicioCardio("Cardio", 20),
     ],
   },
   {
@@ -50,15 +51,16 @@ export const RUTINA_INICIAL = [
       ejercicio("Extensión de cuádriceps",       40, 5,   3, 12, 15,  90),
       ejercicio("Landmine press",                20, 2.5, 3, 8,  10,  90),
       ejercicio("Curl de bíceps con mancuernas", 12, 2,   3, 10, 12,  60),
+      ejercicioCardio("Cardio", 20),
     ],
   },
   {
     id: "c",
-    // Solo si entrenás 3 veces por semana
     nombre: "Día C",
     ejercicios: [
       ejercicio("Sentadilla búlgara con mancuernas", 16, 2, 3, 8, 10, 120),
       ejercicio("Peso muerto rumano",                60, 5, 3, 8, 10, 120),
+      ejercicioCardio("Cardio", 20),
     ],
   },
 ];

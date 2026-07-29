@@ -96,7 +96,7 @@ function NumStep({ value, onChange, step = 1, min = 0 }) {
   );
 }
 
-function SesionCardio({ ej, guardarCardio, salir, terminar }) {
+function SesionCardio({ ej, guardarCardio, salir }) {
   const ultima = ej.historial[ej.historial.length - 1];
   const [duracion, setDuracion] = useState(ultima?.duracion ?? ej.duracionMin);
   const [distancia, setDistancia] = useState(ultima?.distancia ?? ej.distanciaKm ?? 0);
@@ -146,9 +146,8 @@ function SesionCardio({ ej, guardarCardio, salir, terminar }) {
           Registrar
         </Boton>
       </div>
-      <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ marginTop: 10 }}>
         <Boton tono="fantasma" alto={48} onClick={salir}>Volver al menú del día</Boton>
-        <Boton tono="fantasma" alto={44} onClick={terminar} style={{ opacity: 0.5 }}>Terminar sesión</Boton>
       </div>
     </div>
   );
@@ -156,7 +155,7 @@ function SesionCardio({ ej, guardarCardio, salir, terminar }) {
 
 /* ── sesión principal ── */
 
-export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarCardio, initialTimerFin = null, salir, terminar }) {
+export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarCardio, initialTimerFin = null, salir, terminarEjercicio }) {
   // Restore timer from saved state if returning to an exercise mid-session
   const validoInicial = initialTimerFin && initialTimerFin > Date.now() ? initialTimerFin : null;
   const [timerFin, setTimerFin] = useState(validoInicial);
@@ -276,8 +275,12 @@ export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarCardio
           )}
 
           <div style={{ marginTop: 28, display: "flex", flexDirection: "column", gap: 8 }}>
-            <Boton tono="fantasma" alto={48} onClick={() => salir(timerFin)}>Volver al menú del día</Boton>
-            <Boton tono="fantasma" alto={44} onClick={() => { cancelarNotificacion(); terminar(); }} style={{ opacity: 0.5 }}>Terminar sesión</Boton>
+            {sesion.series.length > 0 && (
+              <Boton tono="fuerte" alto={50} onClick={() => { cancelarNotificacion(); terminarEjercicio(); }}>
+                Terminar ejercicio
+              </Boton>
+            )}
+            <Boton tono="fantasma" alto={46} onClick={() => salir(timerFin)}>Volver al menú del día</Boton>
           </div>
 
           {sesion.series.length > 0 && (

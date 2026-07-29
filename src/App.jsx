@@ -222,7 +222,7 @@ export default function App() {
         guardarCardio={guardarCardio}
         initialTimerFin={sesion.progreso?.[ej.id]?.timerFin ?? null}
         salir={volverAlMenu}
-        terminar={salirSesion}
+        terminarEjercicio={() => cerrarEjercicio(sesion.series)}
       />
     );
   }

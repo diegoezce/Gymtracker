@@ -149,7 +149,7 @@ export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarCardio
 
   return (
     <Marco>
-      <Cabecera izq={`${dia.nombre} · ${sesion.idx + 1}/${dia.ejercicios.length}`} onSalir={salir} />
+      <Cabecera izq={`${dia.nombre} · ${sesion.ejIdx + 1}/${dia.ejercicios.length}`} onSalir={salir} />
       {ej.tipo === "cardio" ? (
         <SesionCardio ej={ej} guardarCardio={guardarCardio} salir={salir} terminar={terminar} />
       ) : (

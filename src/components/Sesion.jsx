@@ -233,7 +233,7 @@ export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarCardio
     <Marco>
       <Cabecera izq={`${dia.nombre} · ${sesion.ejIdx + 1}/${dia.ejercicios.length}`} onSalir={salir} />
       {ej.tipo === "cardio" ? (
-        <SesionCardio ej={ej} guardarCardio={guardarCardio} salir={salir} terminar={terminar} />
+        <SesionCardio ej={ej} guardarCardio={guardarCardio} salir={salir} />
       ) : (
         <div style={{ padding: "8px 20px 32px" }}>
           <h1 style={{ fontFamily: SANS, fontSize: 30, fontWeight: 700, lineHeight: 1.1, color: C.hueso, margin: "16px 0 4px" }}>

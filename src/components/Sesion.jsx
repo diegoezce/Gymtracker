@@ -221,6 +221,15 @@ export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarCardio
     prevSeg.current = null;
   };
 
+  const [editandoIdx, setEditandoIdx] = useState(null);
+
+  const editarSerie = (i, campo, valor) => {
+    const nuevas = sesion.series.map((s, idx) =>
+      idx !== i ? s : { ...s, [campo]: valor }
+    );
+    setSesion({ ...sesion, series: nuevas });
+  };
+
   return (
     <Marco>
       <Cabecera izq={`${dia.nombre} · ${sesion.ejIdx + 1}/${dia.ejercicios.length}`} onSalir={salir} />
@@ -275,17 +284,75 @@ export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarCardio
             <div style={{ marginTop: 24 }}>
               <Etiqueta>Series de hoy</Etiqueta>
               <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
-                {sesion.series.map((s, i) => (
-                  <div key={i} style={{
-                    fontFamily: MONO, fontSize: 15, color: C.hueso,
-                    background: C.sup, border: `1px solid ${C.linea}`, borderRadius: 4,
-                    padding: "12px 14px", display: "flex", justifyContent: "space-between",
-                  }}>
-                    <span style={{ color: C.gris }}>{i + 1}</span>
-                    <span>{fmt(s.peso)} kg × {s.reps}</span>
-                    <span style={{ color: C.gris }}>RIR {s.rir}</span>
-                  </div>
-                ))}
+                {sesion.series.map((s, i) => {
+                  const editando = editandoIdx === i;
+                  return (
+                    <div key={i} style={{
+                      background: C.sup,
+                      border: `1px solid ${editando ? C.sodio : C.linea}`,
+                      borderRadius: 4,
+                      overflow: "hidden",
+                    }}>
+                      {/* fila resumen — toca para editar */}
+                      <button
+                        onClick={() => setEditandoIdx(editando ? null : i)}
+                        style={{
+                          width: "100%", background: "none", border: "none", cursor: "pointer",
+                          padding: "12px 14px", display: "flex", justifyContent: "space-between",
+                          alignItems: "center", WebkitTapHighlightColor: "transparent",
+                        }}
+                      >
+                        <span style={{ fontFamily: MONO, fontSize: 14, color: C.gris }}>{i + 1}</span>
+                        <span style={{ fontFamily: MONO, fontSize: 15, color: C.hueso }}>
+                          {fmt(s.peso)} kg × {s.reps} reps
+                        </span>
+                        <span style={{ fontFamily: MONO, fontSize: 12, color: editando ? C.sodio : C.gris }}>
+                          {editando ? "cerrar" : "editar"}
+                        </span>
+                      </button>
+
+                      {/* panel de edición */}
+                      {editando && (
+                        <div style={{ padding: "12px 14px 14px", borderTop: `1px solid ${C.linea}` }}>
+                          {/* peso */}
+                          <div style={{ marginBottom: 12 }}>
+                            <div style={{ fontFamily: SANS, fontSize: 11, color: C.gris, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Peso (kg)</div>
+                            <div style={{ display: "flex", border: `1px solid ${C.linea}`, borderRadius: 4, overflow: "hidden" }}>
+                              <button
+                                onClick={() => editarSerie(i, "peso", Math.max(0, Math.round((s.peso - ej.incremento) * 100) / 100))}
+                                style={{ ...barra("left"), fontSize: 18, color: C.gris }}
+                              >−{fmt(ej.incremento)}</button>
+                              <div style={{ flex: 1, textAlign: "center", fontFamily: MONO, fontSize: 26, fontWeight: 700, color: C.sodio, padding: "10px 0" }}>
+                                {fmt(s.peso)}
+                              </div>
+                              <button
+                                onClick={() => editarSerie(i, "peso", Math.round((s.peso + ej.incremento) * 100) / 100)}
+                                style={{ ...barra("right"), fontSize: 18, color: C.gris }}
+                              >+{fmt(ej.incremento)}</button>
+                            </div>
+                          </div>
+                          {/* reps */}
+                          <div>
+                            <div style={{ fontFamily: SANS, fontSize: 11, color: C.gris, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Reps</div>
+                            <div style={{ display: "flex", border: `1px solid ${C.linea}`, borderRadius: 4, overflow: "hidden" }}>
+                              <button
+                                onClick={() => editarSerie(i, "reps", Math.max(1, s.reps - 1))}
+                                style={{ ...barra("left"), fontSize: 18, color: C.gris }}
+                              >−1</button>
+                              <div style={{ flex: 1, textAlign: "center", fontFamily: MONO, fontSize: 26, fontWeight: 700, color: C.sodio, padding: "10px 0" }}>
+                                {s.reps}
+                              </div>
+                              <button
+                                onClick={() => editarSerie(i, "reps", s.reps + 1)}
+                                style={{ ...barra("right"), fontSize: 18, color: C.gris }}
+                              >+1</button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

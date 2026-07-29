@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { C, MONO, SANS } from "../theme";
 import { barra } from "../styles/helpers";
 import { fmt } from "../utils/format";
@@ -10,6 +10,42 @@ import { Boton } from "./Boton";
 
 const R = 54;
 const CIRC = 2 * Math.PI * R;
+
+/* ── notificaciones ── */
+
+async function pedirPermiso() {
+  if (!("Notification" in window)) return false;
+  if (Notification.permission === "granted") return true;
+  if (Notification.permission === "denied") return false;
+  const result = await Notification.requestPermission();
+  return result === "granted";
+}
+
+async function programarNotificacion(finTimestamp) {
+  const ok = await pedirPermiso();
+  if (!ok || !navigator.serviceWorker) return;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    reg.active?.postMessage({
+      type: "SCHEDULE_NOTIFICATION",
+      tag: "rest-timer",
+      title: "¡Terminó el descanso!",
+      body: "A moverse. Próxima serie lista.",
+      timestamp: finTimestamp,
+    });
+  } catch (_) {}
+}
+
+function cancelarNotificacion() {
+  try {
+    navigator.serviceWorker?.controller?.postMessage({
+      type: "CANCEL_NOTIFICATION",
+      tag: "rest-timer",
+    });
+  } catch (_) {}
+}
+
+/* ── timer ── */
 
 function TimerDescanso({ segundos, total, onSaltar }) {
   const progreso = segundos / total;
@@ -43,21 +79,19 @@ function TimerDescanso({ segundos, total, onSaltar }) {
   );
 }
 
+/* ── cardio ── */
+
 function NumStep({ value, onChange, step = 1, min = 0 }) {
   return (
     <div style={{ display: "flex", border: `1px solid ${C.linea}`, borderRadius: 4, overflow: "hidden" }}>
-      <button
-        onClick={() => onChange(Math.max(min, value - step))}
-        style={{ ...barra("left"), fontSize: 24, fontWeight: 700, color: C.gris }}
-      >−</button>
+      <button onClick={() => onChange(Math.max(min, value - step))}
+        style={{ ...barra("left"), fontSize: 24, fontWeight: 700, color: C.gris }}>−</button>
       <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
         fontFamily: MONO, fontSize: 48, fontWeight: 700, color: C.sodio, padding: "14px 0" }}>
         {value}
       </div>
-      <button
-        onClick={() => onChange(value + step)}
-        style={{ ...barra("right"), fontSize: 24, fontWeight: 700, color: C.gris }}
-      >+</button>
+      <button onClick={() => onChange(value + step)}
+        style={{ ...barra("right"), fontSize: 24, fontWeight: 700, color: C.gris }}>+</button>
     </div>
   );
 }
@@ -90,9 +124,9 @@ function SesionCardio({ ej, guardarCardio, salir, terminar }) {
               style={{ ...barra("left"), fontSize: 24, fontWeight: 700, color: C.gris }}>−</button>
             <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
               fontFamily: MONO, fontSize: 48, fontWeight: 700, color: C.sodio, padding: "14px 0" }}>
-              {distancia.toFixed(1)}
+              {(distancia ?? 0).toFixed(1)}
             </div>
-            <button onClick={() => setDistancia((d) => Math.round((d + 0.5) * 10) / 10)}
+            <button onClick={() => setDistancia((d) => Math.round(((d ?? 0) + 0.5) * 10) / 10)}
               style={{ ...barra("right"), fontSize: 24, fontWeight: 700, color: C.gris }}>+</button>
           </div>
         </div>
@@ -102,7 +136,7 @@ function SesionCardio({ ej, guardarCardio, salir, terminar }) {
         <div style={{ marginTop: 20, padding: "12px 14px", background: C.sup, border: `1px solid ${C.linea}`, borderRadius: 4 }}>
           <Etiqueta>Última sesión ({ultima.fecha})</Etiqueta>
           <div style={{ fontFamily: MONO, fontSize: 15, color: C.hueso, marginTop: 6 }}>
-            {ultima.duracion} min{ultima.distancia != null ? ` · ${ultima.distancia.toFixed(1)} km` : ""}
+            {ultima.duracion} min{ultima.distancia != null ? ` · ${Number(ultima.distancia).toFixed(1)} km` : ""}
           </div>
         </div>
       )}
@@ -120,32 +154,67 @@ function SesionCardio({ ej, guardarCardio, salir, terminar }) {
   );
 }
 
+/* ── sesión principal ── */
+
 export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarCardio, salir, terminar }) {
+  // Timestamp-based timer: more reliable than countdown-by-1 when tab is backgrounded.
+  // timerFin = absolute ms when rest ends; timerSeg = display value recalculated from Date.now().
+  const [timerFin, setTimerFin] = useState(null);
   const [timerSeg, setTimerSeg] = useState(null);
-  const serieNum = sesion.series.length + 1;
+  const prevSeg = useRef(null);
+
   const hayMasSeries = sesion.series.length > 0 && sesion.series.length < ej.series;
 
+  // Start/stop timer when series count changes
   useEffect(() => {
     if (hayMasSeries && ej.descanso) {
+      const fin = Date.now() + ej.descanso * 1000;
+      setTimerFin(fin);
       setTimerSeg(ej.descanso);
+      prevSeg.current = ej.descanso;
+      programarNotificacion(fin);
     } else {
+      setTimerFin(null);
       setTimerSeg(null);
+      prevSeg.current = null;
     }
   }, [sesion.series.length]);
 
+  // Recalculate remaining time from real timestamp every ~500ms
   useEffect(() => {
-    if (timerSeg === null) return;
-    if (timerSeg === 0) {
-      navigator.vibrate?.([200, 100, 200]);
-      setTimerSeg(null);
-      return;
-    }
-    if (timerSeg === 10 || timerSeg === 5) navigator.vibrate?.(80);
-    const id = setTimeout(() => setTimerSeg((t) => t - 1), 1000);
-    return () => clearTimeout(id);
-  }, [timerSeg]);
+    if (!timerFin) return;
+    const tick = () => {
+      const rem = Math.max(0, Math.ceil((timerFin - Date.now()) / 1000));
+      if (rem !== prevSeg.current) {
+        prevSeg.current = rem;
+        setTimerSeg(rem);
+        if (rem === 0) {
+          navigator.vibrate?.([200, 100, 200]);
+          setTimerFin(null);
+        } else if (rem === 10 || rem === 5) {
+          navigator.vibrate?.(80);
+        }
+      }
+    };
+    tick();
+    const id = setInterval(tick, 500);
+    return () => clearInterval(id);
+  }, [timerFin]);
 
-  useEffect(() => { setTimerSeg(null); }, [ej.id]);
+  // Reset timer when switching exercise
+  useEffect(() => {
+    cancelarNotificacion();
+    setTimerFin(null);
+    setTimerSeg(null);
+    prevSeg.current = null;
+  }, [ej.id]);
+
+  const saltarTimer = () => {
+    cancelarNotificacion();
+    setTimerFin(null);
+    setTimerSeg(null);
+    prevSeg.current = null;
+  };
 
   return (
     <Marco>
@@ -158,7 +227,7 @@ export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarCardio
             {ej.nombre}
           </h1>
           <Etiqueta>
-            Serie {serieNum} de {ej.series} · objetivo{" "}
+            Serie {sesion.series.length + 1} de {ej.series} · objetivo{" "}
             {ej.repsMax ? `${ej.repsObjetivo}–${ej.repsMax}` : ej.repsObjetivo} reps
             {ej.descanso ? ` · ${ej.descanso}s descanso` : ""}
           </Etiqueta>
@@ -187,7 +256,7 @@ export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarCardio
           </div>
 
           {timerSeg !== null ? (
-            <TimerDescanso segundos={timerSeg} total={ej.descanso} onSaltar={() => setTimerSeg(null)} />
+            <TimerDescanso segundos={timerSeg} total={ej.descanso} onSaltar={saltarTimer} />
           ) : (
             <Repeticiones objetivo={ej.repsObjetivo} onGuardar={guardarSerie} series={sesion.series} />
           )}

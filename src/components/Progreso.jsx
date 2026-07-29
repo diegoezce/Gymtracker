@@ -137,81 +137,84 @@ export function Progreso({ dias, volver }) {
         )}
 
         {ejerciciosConHistorial.map((e) => {
+          const esCardio = e.tipo === "cardio";
+
+          const cabecera = (
+            <div style={{ marginTop: 30, paddingTop: 22, borderTop: `1px solid ${C.linea}` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
+                <div style={{ fontFamily: SANS, fontSize: 16, fontWeight: 700, color: C.hueso }}>{e.nombre}</div>
+                <div style={{ fontFamily: MONO, fontSize: 11, color: C.gris }}>{e.diaNombre}</div>
+              </div>
+            </div>
+          );
+
+          if (esCardio) {
+            const durData = e.historial.map((h) => ({ fecha: h.fecha, valor: h.duracion ?? 0 }));
+            const distData = e.historial
+              .filter((h) => h.distancia != null)
+              .map((h) => ({ fecha: h.fecha, valor: h.distancia }));
+            const maxDur = Math.max(...durData.map((d) => d.valor));
+            const ultima = e.historial[e.historial.length - 1];
+
+            return (
+              <div key={e.id}>
+                {cabecera}
+                <div style={{ fontFamily: MONO, fontSize: 13, color: C.gris, marginBottom: 14 }}>
+                  <span style={{ color: C.sodio, fontWeight: 700 }}>Máx {maxDur} min</span>
+                  <span> · {e.historial.length} sesión{e.historial.length !== 1 ? "es" : ""}</span>
+                  {ultima && <span> · última {fechaCorta(ultima.fecha)}</span>}
+                </div>
+
+                <Etiqueta>Duración (min)</Etiqueta>
+                <div style={{ marginTop: 8, background: C.sup, border: `1px solid ${C.linea}`, borderRadius: 4, padding: "12px 8px 4px" }}>
+                  <Grafico datos={durData} color={C.sodio} />
+                </div>
+
+                {distData.length > 0 && (
+                  <div style={{ marginTop: 14 }}>
+                    <Etiqueta>Distancia (km)</Etiqueta>
+                    <div style={{ marginTop: 8, background: C.sup, border: `1px solid ${C.linea}`, borderRadius: 4, padding: "12px 8px 4px" }}>
+                      <Grafico datos={distData} color={C.verde} />
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          }
+
           const pesoData = e.historial.map((h) => ({
             fecha: h.fecha,
-            valor: Math.max(...h.series.map((s) => s.peso)),
+            valor: h.series?.length ? Math.max(...h.series.map((s) => s.peso)) : 0,
           }));
           const volData = e.historial.map((h) => ({
             fecha: h.fecha,
-            valor: h.series.reduce((sum, s) => sum + s.peso * s.reps, 0),
+            valor: h.series?.reduce((sum, s) => sum + s.peso * s.reps, 0) ?? 0,
           }));
           const pr = Math.max(...pesoData.map((d) => d.valor));
           const prFecha = pesoData.find((d) => d.valor === pr)?.fecha;
           const volUltima = volData[volData.length - 1]?.valor ?? 0;
 
           return (
-            <div key={e.id} style={{ marginTop: 30, paddingTop: 22, borderTop: `1px solid ${C.linea}` }}>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "baseline",
-                  marginBottom: 4,
-                }}
-              >
-                <div style={{ fontFamily: SANS, fontSize: 16, fontWeight: 700, color: C.hueso }}>
-                  {e.nombre}
-                </div>
-                <div style={{ fontFamily: MONO, fontSize: 11, color: C.gris }}>{e.diaNombre}</div>
-              </div>
-
+            <div key={e.id}>
+              {cabecera}
               <div style={{ fontFamily: MONO, fontSize: 13, color: C.gris, marginBottom: 14 }}>
                 <span style={{ color: C.sodio, fontWeight: 700 }}>PR {fmt(pr)} kg</span>
                 {prFecha && <span> · {fechaCorta(prFecha)}</span>}
-                <span>
-                  {" "}· {e.historial.length} sesión{e.historial.length !== 1 ? "es" : ""}
-                </span>
+                <span> · {e.historial.length} sesión{e.historial.length !== 1 ? "es" : ""}</span>
               </div>
 
               <Etiqueta>Peso máximo (kg)</Etiqueta>
-              <div
-                style={{
-                  marginTop: 8,
-                  background: C.sup,
-                  border: `1px solid ${C.linea}`,
-                  borderRadius: 4,
-                  padding: "12px 8px 4px",
-                }}
-              >
+              <div style={{ marginTop: 8, background: C.sup, border: `1px solid ${C.linea}`, borderRadius: 4, padding: "12px 8px 4px" }}>
                 <Grafico datos={pesoData} color={C.sodio} />
               </div>
 
               <div style={{ marginTop: 14 }}>
                 <Etiqueta>Volumen por sesión (kg totales)</Etiqueta>
-                <div
-                  style={{
-                    marginTop: 8,
-                    background: C.sup,
-                    border: `1px solid ${C.linea}`,
-                    borderRadius: 4,
-                    padding: "12px 8px 4px",
-                  }}
-                >
+                <div style={{ marginTop: 8, background: C.sup, border: `1px solid ${C.linea}`, borderRadius: 4, padding: "12px 8px 4px" }}>
                   <Grafico datos={volData} color={C.verde} />
                 </div>
-                <div
-                  style={{
-                    fontFamily: MONO,
-                    fontSize: 12,
-                    color: C.gris,
-                    marginTop: 6,
-                    textAlign: "right",
-                  }}
-                >
-                  Última sesión:{" "}
-                  <span style={{ color: C.hueso }}>
-                    {volUltima.toLocaleString("es-AR")} kg
-                  </span>
+                <div style={{ fontFamily: MONO, fontSize: 12, color: C.gris, marginTop: 6, textAlign: "right" }}>
+                  Última sesión: <span style={{ color: C.hueso }}>{volUltima.toLocaleString("es-AR")} kg</span>
                 </div>
               </div>
             </div>

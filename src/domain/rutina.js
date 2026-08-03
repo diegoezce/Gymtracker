@@ -47,6 +47,14 @@ export function diasDondeAparece(dias, id) {
   return dias.filter((d) => d.ejercicios.some((e) => e.id === id)).map((d) => d.nombre);
 }
 
+// true si quitar este ejercicio del único día donde aparece se lleva puesto
+// su historial. Si está compartido en otro día, la otra copia lo conserva.
+export function quitarPierdeHistorial(dias, id) {
+  const ej = dias.flatMap((d) => d.ejercicios).find((e) => e.id === id);
+  if (!ej?.historial?.length) return false;
+  return diasDondeAparece(dias, id).length === 1;
+}
+
 // Aplica `cambios` (subset de campos compartidos) a todo ejercicio, en
 // cualquier día, cuyo id coincida.
 export function actualizarCompartido(dias, id, cambios) {

@@ -84,11 +84,12 @@ export default function App() {
     pushRutina(token, diasActualizados).catch(() => {});
   };
 
-  // sesion = { diaId, ejIdx: null | number, pesoActual, series, hechos }
+  // sesion = { diaId, ejIdx: null | number, pesoActual, series, hechos, saltados }
   // ejIdx null → menú del día; number → ejercicio en curso
+  // saltados vive sólo acá: saltear es "hoy no lo hago", no toca la rutina
 
   const comenzar = (dia) =>
-    setSesion({ diaId: dia.id, ejIdx: null, pesoActual: 0, series: [], hechos: {}, progreso: {} });
+    setSesion({ diaId: dia.id, ejIdx: null, pesoActual: 0, series: [], hechos: {}, progreso: {}, saltados: {} });
 
   const dia = sesion ? dias.find((d) => d.id === sesion.diaId) : null;
   const ej = dia && sesion.ejIdx !== null ? dia.ejercicios[sesion.ejIdx] : null;
@@ -157,7 +158,10 @@ export default function App() {
     if (ej && ej.tipo !== "cardio" && sesion.series.length > 0) {
       progreso[ej.id] = { series: sesion.series, pesoActual: sesion.pesoActual };
     }
-    const entradas = Object.entries(progreso).filter(([, p]) => p.series?.length > 0);
+    // los salteados no se registran, aunque tengan series parciales cargadas
+    const entradas = Object.entries(progreso).filter(
+      ([id, p]) => p.series?.length > 0 && !sesion.saltados?.[id]
+    );
     if (entradas.length > 0) {
       let nuevos = dias;
       entradas.forEach(([id, p]) => {
@@ -189,6 +193,14 @@ export default function App() {
     setDias(nuevos);
   };
 
+  // Saltear = "hoy no lo hago". Sólo estado de sesión; la rutina no cambia.
+  const alternarSaltado = (ejId) => {
+    const saltados = { ...sesion.saltados };
+    if (saltados[ejId]) delete saltados[ejId];
+    else saltados[ejId] = true;
+    setSesion({ ...sesion, saltados });
+  };
+
   if (sesion && !ej) {
     return (
       <DiaMenu
@@ -196,7 +208,9 @@ export default function App() {
         dias={dias}
         hechos={sesion.hechos}
         progreso={sesion.progreso ?? {}}
+        saltados={sesion.saltados ?? {}}
         onEjercicio={iniciarEjercicio}
+        onAlternarSaltado={alternarSaltado}
         onTerminar={salirSesion}
         onAgregarEjercicio={(ejFuente, configDia) => agregarEjercicioADia(dia.id, ejFuente, configDia)}
       />

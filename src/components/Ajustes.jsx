@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { C, MONO, SANS } from "../theme";
-import { actualizarCompartido, diasDondeAparece, ejerciciosVinculables } from "../domain/rutina";
+import { actualizarCompartido, diasDondeAparece, ejerciciosVinculables, quitarPierdeHistorial } from "../domain/rutina";
 import { Marco } from "./Marco";
 import { Cabecera } from "./Cabecera";
 import { Boton } from "./Boton";
@@ -124,27 +124,70 @@ const QUITAR_BTN = {
   lineHeight: 1,
 };
 
+const CONFIRM_BTN = {
+  background: "none",
+  border: `1px solid ${C.linea}`,
+  borderRadius: 4,
+  color: C.gris,
+  fontFamily: SANS,
+  fontSize: 13,
+  padding: "7px 14px",
+  cursor: "pointer",
+};
+
 function CabeceraCard({ ej, diaId, dias, onEditar, onQuitar }) {
+  const [confirmando, setConfirmando] = useState(false);
   const e = (campo, valor) => onEditar(diaId, ej.id, campo, valor);
   const diaActual = dias.find((d) => d.id === diaId)?.nombre;
   const otrosDias = diasDondeAparece(dias, ej.id).filter((n) => n !== diaActual);
+
+  // Sólo preguntamos si al sacarlo se pierde el historial: si está en otro
+  // día, esa copia lo conserva y no hay nada que perder.
+  const intentarQuitar = () => {
+    if (quitarPierdeHistorial(dias, ej.id)) setConfirmando(true);
+    else onQuitar(diaId, ej.id);
+  };
+
   return (
-    <div style={{ padding: "14px 14px 10px", display: "flex", gap: 10, alignItems: "center" }}>
-      <div style={{ flex: 1 }}>
-        <TextInput value={ej.nombre} onChange={(v) => e("nombre", v)} placeholder="Nombre del ejercicio" />
-        {otrosDias.length > 0 && (
-          <div style={{ fontFamily: SANS, fontSize: 11, color: C.sodio, marginTop: 4 }}>
-            también en {otrosDias.join(", ")} · mismo peso/progreso
-          </div>
+    <>
+      <div style={{ padding: "14px 14px 10px", display: "flex", gap: 10, alignItems: "center" }}>
+        <div style={{ flex: 1 }}>
+          <TextInput value={ej.nombre} onChange={(v) => e("nombre", v)} placeholder="Nombre del ejercicio" />
+          {otrosDias.length > 0 && (
+            <div style={{ fontFamily: SANS, fontSize: 11, color: C.sodio, marginTop: 4 }}>
+              también en {otrosDias.join(", ")} · mismo peso/progreso
+            </div>
+          )}
+        </div>
+        {ej.tipo === "cardio" && (
+          <span style={{ fontFamily: SANS, fontSize: 11, color: C.sodio, background: "#1a2a1a", borderRadius: 3, padding: "2px 6px", flexShrink: 0 }}>
+            CARDIO
+          </span>
         )}
+        <button onClick={intentarQuitar} style={QUITAR_BTN}>×</button>
       </div>
-      {ej.tipo === "cardio" && (
-        <span style={{ fontFamily: SANS, fontSize: 11, color: C.sodio, background: "#1a2a1a", borderRadius: 3, padding: "2px 6px", flexShrink: 0 }}>
-          CARDIO
-        </span>
+
+      {confirmando && (
+        <div style={{ padding: "12px 14px", background: "#2a1a1a", borderTop: `1px solid #3a2a2a` }}>
+          <div style={{ fontFamily: SANS, fontSize: 13, color: C.hueso, lineHeight: 1.45 }}>
+            Tiene {ej.historial.length}{" "}
+            {ej.historial.length === 1 ? "sesión registrada" : "sesiones registradas"}. Si lo
+            quitás se pierde ese historial.
+          </div>
+          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+            <button onClick={() => setConfirmando(false)} style={CONFIRM_BTN}>
+              Cancelar
+            </button>
+            <button
+              onClick={() => { setConfirmando(false); onQuitar(diaId, ej.id); }}
+              style={{ ...CONFIRM_BTN, color: "#c0392b", borderColor: "#3a2a2a" }}
+            >
+              Quitar igual
+            </button>
+          </div>
+        </div>
       )}
-      <button onClick={() => onQuitar(diaId, ej.id)} style={QUITAR_BTN}>×</button>
-    </div>
+    </>
   );
 }
 

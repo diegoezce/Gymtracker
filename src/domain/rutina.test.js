@@ -7,6 +7,7 @@ import {
   ejerciciosVinculables,
   resincronizarCompartidos,
   diasDondeAparece,
+  quitarPierdeHistorial,
 } from "./rutina";
 
 function dosDias() {
@@ -92,6 +93,37 @@ describe("diasDondeAparece", () => {
     const { dias, banca } = dosDias();
     const vinculado = vincularEjercicio(dias, banca, "b");
     expect(diasDondeAparece(vinculado, banca.id)).toEqual(["Día A", "Día B"]);
+  });
+});
+
+describe("quitarPierdeHistorial", () => {
+  const conHistorial = (ej) => ({
+    ...ej,
+    historial: [{ fecha: "2026-07-01", series: [{ peso: 60, reps: 8, rir: 1 }] }],
+  });
+
+  it("es false si el ejercicio no tiene historial", () => {
+    const { dias, banca } = dosDias();
+    expect(quitarPierdeHistorial(dias, banca.id)).toBe(false);
+  });
+
+  it("es false si tiene historial pero está compartido en otro día", () => {
+    const { banca } = dosDias();
+    const conHist = conHistorial(banca);
+    const dias = [
+      { id: "a", nombre: "Día A", ejercicios: [conHist] },
+      { id: "b", nombre: "Día B", ejercicios: [conHist] },
+    ];
+    expect(quitarPierdeHistorial(dias, banca.id)).toBe(false);
+  });
+
+  it("es true si tiene historial y aparece en un solo día", () => {
+    const { banca } = dosDias();
+    const dias = [
+      { id: "a", nombre: "Día A", ejercicios: [conHistorial(banca)] },
+      { id: "b", nombre: "Día B", ejercicios: [] },
+    ];
+    expect(quitarPierdeHistorial(dias, banca.id)).toBe(true);
   });
 });
 

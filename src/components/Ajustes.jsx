@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { C, MONO, SANS } from "../theme";
-import { ejercicio as nuevoEjercicio, ejercicioCardio as nuevoCardio } from "../domain/rutina";
+import { actualizarCompartido, diasDondeAparece, ejerciciosVinculables } from "../domain/rutina";
 import { Marco } from "./Marco";
 import { Cabecera } from "./Cabecera";
 import { Boton } from "./Boton";
+import { SelectorEjercicio } from "./SelectorEjercicio";
 import {
   TOKEN_KEY,
   SYNC_KEY,
@@ -123,12 +124,19 @@ const QUITAR_BTN = {
   lineHeight: 1,
 };
 
-function CabeceraCard({ ej, diaId, onEditar, onQuitar }) {
+function CabeceraCard({ ej, diaId, dias, onEditar, onQuitar }) {
   const e = (campo, valor) => onEditar(diaId, ej.id, campo, valor);
+  const diaActual = dias.find((d) => d.id === diaId)?.nombre;
+  const otrosDias = diasDondeAparece(dias, ej.id).filter((n) => n !== diaActual);
   return (
     <div style={{ padding: "14px 14px 10px", display: "flex", gap: 10, alignItems: "center" }}>
       <div style={{ flex: 1 }}>
         <TextInput value={ej.nombre} onChange={(v) => e("nombre", v)} placeholder="Nombre del ejercicio" />
+        {otrosDias.length > 0 && (
+          <div style={{ fontFamily: SANS, fontSize: 11, color: C.sodio, marginTop: 4 }}>
+            también en {otrosDias.join(", ")} · mismo peso/progreso
+          </div>
+        )}
       </div>
       {ej.tipo === "cardio" && (
         <span style={{ fontFamily: SANS, fontSize: 11, color: C.sodio, background: "#1a2a1a", borderRadius: 3, padding: "2px 6px", flexShrink: 0 }}>
@@ -146,7 +154,7 @@ function TarjetaCardio({ ej, diaId, dias, onEditar, onQuitar, onMover }) {
 
   return (
     <div style={{ background: C.sup, border: `1px solid ${C.linea}`, borderRadius: 6, marginBottom: 8, overflow: "hidden" }}>
-      <CabeceraCard ej={ej} diaId={diaId} onEditar={onEditar} onQuitar={onQuitar} />
+      <CabeceraCard ej={ej} diaId={diaId} dias={dias} onEditar={onEditar} onQuitar={onQuitar} />
 
       <div style={{ padding: "0 14px 12px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
         <div>
@@ -190,7 +198,7 @@ function TarjetaFuerza({ ej, diaId, dias, onEditar, onQuitar, onMover }) {
 
   return (
     <div style={{ background: C.sup, border: `1px solid ${C.linea}`, borderRadius: 6, marginBottom: 8, overflow: "hidden" }}>
-      <CabeceraCard ej={ej} diaId={diaId} onEditar={onEditar} onQuitar={onQuitar} />
+      <CabeceraCard ej={ej} diaId={diaId} dias={dias} onEditar={onEditar} onQuitar={onQuitar} />
 
       {/* fila principal: series · reps · descanso */}
       <div style={{ padding: "0 14px 12px", display: "grid", gridTemplateColumns: "1fr 2fr 1fr", gap: 8 }}>
@@ -395,21 +403,22 @@ function SyncPanel({ dias, restaurarDesdeHC }) {
 
 /* ── pantalla principal ── */
 
-export function Ajustes({ dias, setDias, restaurarDesdeHC, volver }) {
-  const editar = (diaId, ejId, campo, valor) =>
-    setDias(dias.map((d) =>
-      d.id !== diaId ? d : { ...d, ejercicios: d.ejercicios.map((e) => (e.id !== ejId ? e : { ...e, [campo]: valor })) }
-    ));
+// Campos compartidos entre copias del mismo ejercicio en distintos días —
+// ver actualizarCompartido en domain/rutina.js.
+const CAMPOS_COMPARTIDOS = new Set(["nombre", "peso", "incremento", "repsObjetivo"]);
 
-  const agregarEjercicio = (diaId) =>
-    setDias(dias.map((d) =>
-      d.id !== diaId ? d : { ...d, ejercicios: [...d.ejercicios, nuevoEjercicio("Nuevo ejercicio", 20, 2.5, 3, 8, 12, 90)] }
-    ));
+export function Ajustes({ dias, setDias, agregarEjercicioADia, restaurarDesdeHC, volver }) {
+  const [agregandoEnDia, setAgregandoEnDia] = useState(null);
 
-  const agregarCardio = (diaId) =>
-    setDias(dias.map((d) =>
-      d.id !== diaId ? d : { ...d, ejercicios: [...d.ejercicios, nuevoCardio("Cardio", 30, null)] }
-    ));
+  const editar = (diaId, ejId, campo, valor) => {
+    if (CAMPOS_COMPARTIDOS.has(campo)) {
+      setDias(actualizarCompartido(dias, ejId, { [campo]: valor }));
+    } else {
+      setDias(dias.map((d) =>
+        d.id !== diaId ? d : { ...d, ejercicios: d.ejercicios.map((e) => (e.id !== ejId ? e : { ...e, [campo]: valor })) }
+      ));
+    }
+  };
 
   const quitarEjercicio = (diaId, ejId) =>
     setDias(dias.map((d) =>
@@ -425,6 +434,23 @@ export function Ajustes({ dias, setDias, restaurarDesdeHC, volver }) {
       return d;
     }));
   };
+
+  if (agregandoEnDia) {
+    return (
+      <SelectorEjercicio
+        candidatos={ejerciciosVinculables(dias, agregandoEnDia)}
+        onSeleccionar={(ej) => {
+          agregarEjercicioADia(agregandoEnDia, ej);
+          setAgregandoEnDia(null);
+        }}
+        onCrearNuevo={(ej) => {
+          agregarEjercicioADia(agregandoEnDia, ej);
+          setAgregandoEnDia(null);
+        }}
+        volver={() => setAgregandoEnDia(null)}
+      />
+    );
+  }
 
   return (
     <Marco>
@@ -465,20 +491,12 @@ export function Ajustes({ dias, setDias, restaurarDesdeHC, volver }) {
               />
             ))}
 
-            <div style={{ display: "flex", gap: 8 }}>
-              <button
-                onClick={() => agregarEjercicio(d.id)}
-                style={{ flex: 1, background: "none", border: `1px dashed ${C.linea}`, borderRadius: 6, color: C.gris, fontFamily: SANS, fontSize: 14, padding: "13px 0", cursor: "pointer" }}
-              >
-                + Fuerza
-              </button>
-              <button
-                onClick={() => agregarCardio(d.id)}
-                style={{ flex: 1, background: "none", border: `1px dashed ${C.linea}`, borderRadius: 6, color: C.gris, fontFamily: SANS, fontSize: 14, padding: "13px 0", cursor: "pointer" }}
-              >
-                + Cardio
-              </button>
-            </div>
+            <button
+              onClick={() => setAgregandoEnDia(d.id)}
+              style={{ width: "100%", background: "none", border: `1px dashed ${C.linea}`, borderRadius: 6, color: C.gris, fontFamily: SANS, fontSize: 14, padding: "13px 0", cursor: "pointer" }}
+            >
+              + Agregar ejercicio
+            </button>
           </div>
         ))}
 

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { storage, CLAVE_RUTINA } from "./storage";
-import { RUTINA_INICIAL } from "./domain/rutina";
+import { RUTINA_INICIAL, actualizarCompartido, vincularEjercicio, resincronizarCompartidos } from "./domain/rutina";
 import { leerToken, leerAutoSync, fetchSesiones, aplicarSesiones, pushSesiones, construirSesiones, pushRutina, fetchRutina, aplicarRutina } from "./sync/hcAdapter";
 import { progresar, aprender } from "./domain/progression";
 import { hoy } from "./utils/format";
@@ -36,9 +36,9 @@ export default function App() {
                 fetchSesiones(token),
               ]);
               if (rutina) {
-                setDias((prev) => aplicarSesiones(aplicarRutina(rutina, prev), sesiones));
+                setDias((prev) => resincronizarCompartidos(aplicarSesiones(aplicarRutina(rutina, prev), sesiones)));
               } else {
-                setDias((prev) => aplicarSesiones(prev, sesiones));
+                setDias((prev) => resincronizarCompartidos(aplicarSesiones(prev, sesiones)));
               }
             } catch (_) {}
           }
@@ -105,17 +105,9 @@ export default function App() {
   };
 
   const guardarCardio = (duracion, distancia) => {
-    const nuevos = dias.map((d) =>
-      d.id !== dia.id ? d : {
-        ...d,
-        ejercicios: d.ejercicios.map((e) =>
-          e.id !== ej.id ? e : {
-            ...e,
-            historial: [...e.historial, { fecha: hoy(), duracion, distancia }].slice(-40),
-          }
-        ),
-      }
-    );
+    const nuevos = actualizarCompartido(dias, ej.id, {
+      historial: [...ej.historial, { fecha: hoy(), duracion, distancia }].slice(-40),
+    });
     setDias(nuevos);
     syncSilencioso(nuevos);
     setSesion({ ...sesion, ejIdx: null, series: [], hechos: { ...sesion.hechos, [ej.id]: true } });
@@ -133,19 +125,13 @@ export default function App() {
   const cerrarEjercicio = (series) => {
     const { peso, repsObjetivo, nota } = progresar(ej, series);
     const { ajustes, incremento, aviso: av } = aprender(ej, series[0].peso);
-    const nuevos = dias.map((d) =>
-      d.id !== dia.id
-        ? d
-        : {
-            ...d,
-            ejercicios: d.ejercicios.map((e) =>
-              e.id !== ej.id
-                ? e
-                : { ...e, peso, repsObjetivo, incremento, ajustes,
-                    historial: [...e.historial, { fecha: hoy(), series }].slice(-40) }
-            ),
-          }
-    );
+    const nuevos = actualizarCompartido(dias, ej.id, {
+      peso,
+      repsObjetivo,
+      incremento,
+      ajustes,
+      historial: [...ej.historial, { fecha: hoy(), series }].slice(-40),
+    });
     setDias(nuevos);
     setAviso(av || nota);
     syncSilencioso(nuevos);
@@ -171,18 +157,15 @@ export default function App() {
     if (ej && ej.tipo !== "cardio" && sesion.series.length > 0) {
       progreso[ej.id] = { series: sesion.series, pesoActual: sesion.pesoActual };
     }
-    const hayParciales = Object.values(progreso).some((p) => p.series?.length > 0);
-    if (hayParciales) {
-      const nuevos = dias.map((d) => {
-        if (d.id !== sesion.diaId) return d;
-        return {
-          ...d,
-          ejercicios: d.ejercicios.map((e) => {
-            const p = progreso[e.id];
-            if (!p || !p.series?.length) return e;
-            return { ...e, historial: [...e.historial, { fecha: hoy(), series: p.series }].slice(-40) };
-          }),
-        };
+    const entradas = Object.entries(progreso).filter(([, p]) => p.series?.length > 0);
+    if (entradas.length > 0) {
+      let nuevos = dias;
+      entradas.forEach(([id, p]) => {
+        const actual = dia.ejercicios.find((e) => e.id === id);
+        if (!actual) return;
+        nuevos = actualizarCompartido(nuevos, id, {
+          historial: [...actual.historial, { fecha: hoy(), series: p.series }].slice(-40),
+        });
       });
       setDias(nuevos);
       syncSilencioso(nuevos);
@@ -195,18 +178,27 @@ export default function App() {
     const token = leerToken();
     if (!token) throw new Error("Sin token");
     const { sesiones } = await fetchSesiones(token);
-    setDias((prev) => aplicarSesiones(prev, sesiones));
+    setDias((prev) => resincronizarCompartidos(aplicarSesiones(prev, sesiones)));
     return sesiones.length;
+  };
+
+  // Agrega ejFuente (existente en otro día, o recién creado) a diaId,
+  // preservando su id si ya existía en otro lado para que compartan progreso.
+  const agregarEjercicioADia = (diaId, ejFuente, configDia = {}) => {
+    const nuevos = vincularEjercicio(dias, ejFuente, diaId, configDia);
+    setDias(nuevos);
   };
 
   if (sesion && !ej) {
     return (
       <DiaMenu
         dia={dia}
+        dias={dias}
         hechos={sesion.hechos}
         progreso={sesion.progreso ?? {}}
         onEjercicio={iniciarEjercicio}
         onTerminar={salirSesion}
+        onAgregarEjercicio={(ejFuente, configDia) => agregarEjercicioADia(dia.id, ejFuente, configDia)}
       />
     );
   }
@@ -228,7 +220,15 @@ export default function App() {
   }
 
   if (pantalla === "ajustes")
-    return <Ajustes dias={dias} setDias={setDias} restaurarDesdeHC={restaurarDesdeHC} volver={() => { syncRutinaSilenciosa(dias); setPantalla("inicio"); }} />;
+    return (
+      <Ajustes
+        dias={dias}
+        setDias={setDias}
+        agregarEjercicioADia={agregarEjercicioADia}
+        restaurarDesdeHC={restaurarDesdeHC}
+        volver={() => { syncRutinaSilenciosa(dias); setPantalla("inicio"); }}
+      />
+    );
 
   if (pantalla === "historial")
     return <Progreso dias={dias} volver={() => setPantalla("inicio")} />;

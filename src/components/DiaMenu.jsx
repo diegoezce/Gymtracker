@@ -1,12 +1,33 @@
+import { useState } from "react";
 import { C, MONO, SANS } from "../theme";
-import { fmt } from "../utils/format";
+import { fmt, diasDesdeStr } from "../utils/format";
+import { ejerciciosVinculables } from "../domain/rutina";
 import { Marco } from "./Marco";
 import { Cabecera } from "./Cabecera";
 import { Boton } from "./Boton";
+import { SelectorEjercicio } from "./SelectorEjercicio";
 
-export function DiaMenu({ dia, hechos, progreso = {}, onEjercicio, onTerminar }) {
+export function DiaMenu({ dia, dias, hechos, progreso = {}, onEjercicio, onTerminar, onAgregarEjercicio }) {
+  const [agregando, setAgregando] = useState(false);
   const total = dia.ejercicios.length;
   const doneCount = Object.keys(hechos).length;
+
+  if (agregando) {
+    return (
+      <SelectorEjercicio
+        candidatos={ejerciciosVinculables(dias, dia.id)}
+        onSeleccionar={(ej) => {
+          onAgregarEjercicio(ej);
+          setAgregando(false);
+        }}
+        onCrearNuevo={(ej) => {
+          onAgregarEjercicio(ej);
+          setAgregando(false);
+        }}
+        volver={() => setAgregando(false)}
+      />
+    );
+  }
 
   return (
     <Marco>
@@ -16,6 +37,7 @@ export function DiaMenu({ dia, hechos, progreso = {}, onEjercicio, onTerminar })
           {dia.ejercicios.map((e, idx) => {
             const hecho = !!hechos[e.id];
             const parcial = !hecho && progreso[e.id]?.series?.length > 0 ? progreso[e.id] : null;
+            const ultima = e.historial[e.historial.length - 1];
             return (
               <button
                 key={e.id}
@@ -59,12 +81,35 @@ export function DiaMenu({ dia, hechos, progreso = {}, onEjercicio, onTerminar })
                     ? `${parcial.series.length} de ${e.series} series hechas`
                     : `${e.series} × ${e.repsMax ? `${e.repsMin}–${e.repsMax}` : e.repsObjetivo} reps${e.descanso ? ` · ${e.descanso}s` : ""}`}
                 </div>
+                <div style={{ fontFamily: MONO, fontSize: 11, color: C.gris, marginTop: 3, opacity: 0.75 }}>
+                  {ultima ? `última vez: ${diasDesdeStr(ultima.fecha)}` : "todavía no hecho"}
+                </div>
               </button>
             );
           })}
         </div>
 
-        <div style={{ marginTop: 28 }}>
+        <div style={{ marginTop: 16 }}>
+          <button
+            onClick={() => setAgregando(true)}
+            style={{
+              width: "100%",
+              background: "none",
+              border: `1px dashed ${C.linea}`,
+              borderRadius: 6,
+              color: C.gris,
+              fontFamily: SANS,
+              fontSize: 14,
+              padding: "13px 0",
+              cursor: "pointer",
+              WebkitTapHighlightColor: "transparent",
+            }}
+          >
+            + Agregar ejercicio
+          </button>
+        </div>
+
+        <div style={{ marginTop: 16 }}>
           <Boton tono="fantasma" alto={54} onClick={onTerminar}>
             Terminar sesión
           </Boton>

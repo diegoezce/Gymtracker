@@ -1,5 +1,6 @@
 import { C, MONO, SANS } from "../theme";
-import { fmt, fechaCorta } from "../utils/format";
+import { fmt, fechaCorta, diasDesdeStr } from "../utils/format";
+import { diasDondeAparece } from "../domain/rutina";
 import { Marco } from "./Marco";
 import { Cabecera } from "./Cabecera";
 import { Boton } from "./Boton";
@@ -57,13 +58,6 @@ function Grafico({ datos, color = C.sodio }) {
   );
 }
 
-function diasDesdeStr(iso) {
-  const diff = Math.floor((Date.now() - new Date(iso)) / 86400000);
-  if (diff === 0) return "hoy";
-  if (diff === 1) return "ayer";
-  return `hace ${diff} días`;
-}
-
 export function Progreso({ dias, volver }) {
   const ahora = new Date();
 
@@ -87,10 +81,17 @@ export function Progreso({ dias, volver }) {
     return d.getMonth() === ahora.getMonth() && d.getFullYear() === ahora.getFullYear();
   }).length;
 
+  // Un ejercicio compartido entre días (mismo id) aparece una sola vez acá.
+  const vistos = new Set();
   const ejerciciosConHistorial = dias.flatMap((d) =>
     d.ejercicios
       .filter((e) => e.historial.length > 0)
-      .map((e) => ({ ...e, diaNombre: d.nombre }))
+      .filter((e) => {
+        if (vistos.has(e.id)) return false;
+        vistos.add(e.id);
+        return true;
+      })
+      .map((e) => ({ ...e, diaNombre: diasDondeAparece(dias, e.id).join(" · ") }))
   );
 
   return (

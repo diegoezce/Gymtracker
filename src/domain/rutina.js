@@ -27,6 +27,111 @@ export const ejercicioCardio = (nombre, duracionMin = 30, distanciaKm = null) =>
   historial: [],
 });
 
+// ── ejercicios compartidos entre días ──────────────────────────
+// Dos ejercicios en días distintos con el mismo `id` se consideran el
+// mismo movimiento: peso/incremento/repsObjetivo/ajustes/historial se
+// mantienen sincronizados entre copias. Series/reps/descanso (o
+// duración/distancia en cardio) quedan libres para variar por día.
+
+const CAMPOS_COMPARTIDOS = ["id", "tipo", "nombre", "peso", "incremento", "repsObjetivo", "ajustes", "historial"];
+
+function camposCompartidos(ej) {
+  const out = {};
+  CAMPOS_COMPARTIDOS.forEach((k) => {
+    if (k in ej) out[k] = ej[k];
+  });
+  return out;
+}
+
+export function diasDondeAparece(dias, id) {
+  return dias.filter((d) => d.ejercicios.some((e) => e.id === id)).map((d) => d.nombre);
+}
+
+// Aplica `cambios` (subset de campos compartidos) a todo ejercicio, en
+// cualquier día, cuyo id coincida.
+export function actualizarCompartido(dias, id, cambios) {
+  return dias.map((d) => ({
+    ...d,
+    ejercicios: d.ejercicios.map((e) => (e.id === id ? { ...e, ...cambios } : e)),
+  }));
+}
+
+// Agrega a `diaDestinoId` una copia de `ejFuente` que preserva su id y
+// campos compartidos; `configDia` son los campos propios de ese día
+// (series/repsMin/repsMax/descanso, o duracionMin/distanciaKm en cardio),
+// con default tomado del propio ejFuente si no se especifican.
+export function vincularEjercicio(dias, ejFuente, diaDestinoId, configDia = {}) {
+  const compartido = camposCompartidos(ejFuente);
+  const configDefault =
+    ejFuente.tipo === "cardio"
+      ? { duracionMin: ejFuente.duracionMin ?? 30, distanciaKm: ejFuente.distanciaKm ?? null }
+      : {
+          series: ejFuente.series ?? 3,
+          repsMin: ejFuente.repsMin ?? 8,
+          repsMax: ejFuente.repsMax ?? null,
+          descanso: ejFuente.descanso ?? 90,
+        };
+  const nuevo = { ...compartido, ...configDefault, ...configDia };
+  return dias.map((d) => (d.id !== diaDestinoId ? d : { ...d, ejercicios: [...d.ejercicios, nuevo] }));
+}
+
+// Candidatos para "usar existente" en `diaId`: ejercicios de otros días,
+// deduplicados por id, que todavía no están en `diaId`.
+export function ejerciciosVinculables(dias, diaId) {
+  const enEsteDia = new Set(dias.find((d) => d.id === diaId)?.ejercicios.map((e) => e.id) ?? []);
+  const vistos = new Set();
+  const resultado = [];
+  dias.forEach((d) => {
+    if (d.id === diaId) return;
+    d.ejercicios.forEach((e) => {
+      if (enEsteDia.has(e.id) || vistos.has(e.id)) return;
+      vistos.add(e.id);
+      resultado.push({ ...e, diasDonde: diasDondeAparece(dias, e.id) });
+    });
+  });
+  return resultado;
+}
+
+// Reconcilia ejercicios compartidos (mismo id en más de un día) cuyas
+// copias de historial se desincronizaron — típicamente después de
+// restaurar desde HC, donde cada día se reconstruye por separado a partir
+// de sesiones logueadas con (día, nombre). Une+ordena+dedupea el
+// historial de todas las copias y recalcula peso/repsObjetivo/incremento/
+// ajustes desde la entrada más reciente, aplicando el resultado a todas.
+export function resincronizarCompartidos(dias) {
+  const grupos = {};
+  dias.forEach((d) => d.ejercicios.forEach((e) => (grupos[e.id] ??= []).push(e)));
+
+  const mergeados = {};
+  Object.entries(grupos).forEach(([id, ejs]) => {
+    if (ejs.length < 2) return;
+    const porFecha = new Map();
+    ejs.forEach((e) => (e.historial ?? []).forEach((h) => porFecha.set(h.fecha, h)));
+    const historial = [...porFecha.values()].sort((a, b) => a.fecha.localeCompare(b.fecha)).slice(-40);
+    const masReciente = ejs.reduce((mejor, e) => {
+      const f = e.historial?.[e.historial.length - 1]?.fecha ?? "";
+      const fMejor = mejor.historial?.[mejor.historial.length - 1]?.fecha ?? "";
+      return f > fMejor ? e : mejor;
+    }, ejs[0]);
+    mergeados[id] =
+      ejs[0].tipo === "cardio"
+        ? { historial }
+        : {
+            historial,
+            peso: masReciente.peso,
+            repsObjetivo: masReciente.repsObjetivo,
+            incremento: masReciente.incremento,
+            ajustes: masReciente.ajustes,
+          };
+  });
+
+  if (Object.keys(mergeados).length === 0) return dias;
+  return dias.map((d) => ({
+    ...d,
+    ejercicios: d.ejercicios.map((e) => (mergeados[e.id] ? { ...e, ...mergeados[e.id] } : e)),
+  }));
+}
+
 export const RUTINA_INICIAL = [
   {
     id: "a",

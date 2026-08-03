@@ -9,3 +9,10 @@ export const fechaCorta = (iso) => {
   const [, m, d] = iso.split("-");
   return `${d}/${m}`;
 };
+
+export const diasDesdeStr = (iso) => {
+  const diff = Math.floor((Date.now() - new Date(iso)) / 86400000);
+  if (diff === 0) return "hoy";
+  if (diff === 1) return "ayer";
+  return `hace ${diff} días`;
+};

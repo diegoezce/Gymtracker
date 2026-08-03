@@ -178,12 +178,20 @@ export default function App() {
     setPantalla("inicio");
   };
 
-  const restaurarDesdeHC = async () => {
+  // Trae sólo el historial: lo aplica sobre la rutina local que ya tengas.
+  const traerHistorialDeHC = async () => {
     const token = leerToken();
     if (!token) throw new Error("Sin token");
     const { sesiones } = await fetchSesiones(token);
     setDias((prev) => resincronizarCompartidos(aplicarSesiones(prev, sesiones)));
     return sesiones.length;
+  };
+
+  // Reemplaza la rutina local por la de HC, conservando el historial local
+  // de los ejercicios que coinciden por id. El fetch lo hace el panel de
+  // Ajustes, que necesita los datos para mostrar la confirmación.
+  const aplicarRutinaDeHC = (rutina) => {
+    setDias((prev) => resincronizarCompartidos(aplicarRutina(rutina, prev)));
   };
 
   // Agrega ejFuente (existente en otro día, o recién creado) a diaId,
@@ -239,7 +247,8 @@ export default function App() {
         dias={dias}
         setDias={setDias}
         agregarEjercicioADia={agregarEjercicioADia}
-        restaurarDesdeHC={restaurarDesdeHC}
+        traerHistorialDeHC={traerHistorialDeHC}
+        aplicarRutinaDeHC={aplicarRutinaDeHC}
         volver={() => { syncRutinaSilenciosa(dias); setPantalla("inicio"); }}
       />
     );

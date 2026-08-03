@@ -14,6 +14,7 @@ import {
   obtenerToken,
   pushSesiones,
   construirSesiones,
+  fetchRutina,
 } from "../sync/hcAdapter";
 
 /* ── componentes primitivos ── */
@@ -317,13 +318,19 @@ function TarjetaEjercicio(props) {
 
 /* ── panel de sync ── */
 
-function SyncPanel({ dias, restaurarDesdeHC }) {
+const contarRutina = (ds) => ({
+  dias: ds.length,
+  ejercicios: ds.reduce((n, d) => n + d.ejercicios.length, 0),
+});
+
+function SyncPanel({ dias, traerHistorialDeHC, aplicarRutinaDeHC }) {
   const [token, setToken] = useState(leerToken);
   const [usuario, setUsuario] = useState("");
   const [clave, setClave] = useState("");
   const [estado, setEstado] = useState("idle");
   const [mensaje, setMensaje] = useState("");
   const [autoSync, setAutoSync] = useState(leerAutoSync);
+  const [rutinaHC, setRutinaHC] = useState(null); // bajada, esperando confirmación
   const ultimaSync = localStorage.getItem(SYNC_KEY);
 
   function toggleAutoSync(v) {
@@ -355,16 +362,43 @@ function SyncPanel({ dias, restaurarDesdeHC }) {
     }
   }
 
-  async function restaurar() {
+  async function traerHistorial() {
     setEstado("cargando"); setMensaje("");
     try {
-      const count = await restaurarDesdeHC();
+      const count = await traerHistorialDeHC();
       setEstado("ok");
       setMensaje(`${count} sesión${count !== 1 ? "es" : ""} recuperada${count !== 1 ? "s" : ""}.`);
     } catch (e) {
       if (e.message === "401") { localStorage.removeItem(TOKEN_KEY); setToken(null); }
       setEstado("error"); setMensaje(e.message);
     }
+  }
+
+  // Dos fases: bajamos la rutina primero para poder mostrar en la
+  // confirmación qué se va a reemplazar por qué.
+  async function pedirRutina() {
+    setEstado("cargando"); setMensaje(""); setRutinaHC(null);
+    try {
+      const { rutina } = await fetchRutina(token);
+      if (!rutina?.length) {
+        setEstado("error");
+        setMensaje("No hay ninguna rutina guardada en HC todavía.");
+        return;
+      }
+      setRutinaHC(rutina);
+      setEstado("idle");
+    } catch (e) {
+      if (e.message === "401") { localStorage.removeItem(TOKEN_KEY); setToken(null); }
+      setEstado("error"); setMensaje(e.message === "401" ? "Token expirado. Volvé a conectarte." : e.message);
+    }
+  }
+
+  function confirmarRutina() {
+    const { dias: d, ejercicios: e } = contarRutina(rutinaHC);
+    aplicarRutinaDeHC(rutinaHC);
+    setRutinaHC(null);
+    setEstado("ok");
+    setMensaje(`Rutina traída de HC: ${d} día${d !== 1 ? "s" : ""}, ${e} ejercicio${e !== 1 ? "s" : ""}.`);
   }
 
   function desconectar() {
@@ -423,9 +457,38 @@ function SyncPanel({ dias, restaurarDesdeHC }) {
           <Boton tono={cargando ? "neutro" : "fuerte"} alto={54} onClick={sincronizar} style={{ opacity: cargando ? 0.5 : 1 }}>
             {cargando ? "Sincronizando…" : "Sincronizar ahora"}
           </Boton>
-          <Boton tono="fantasma" alto={46} onClick={restaurar} style={{ opacity: cargando ? 0.5 : 1 }}>
-            Restaurar desde HC
+
+          <Boton tono="fantasma" alto={46} onClick={pedirRutina} style={{ opacity: cargando ? 0.5 : 1 }}>
+            Traer rutina de HC
           </Boton>
+
+          {rutinaHC && (
+            <div style={{ background: C.sup, border: `1px solid ${C.sodio}`, borderRadius: 6, padding: "12px 14px" }}>
+              <div style={{ fontFamily: SANS, fontSize: 13, color: C.hueso, lineHeight: 1.5 }}>
+                Tu rutina local ({contarRutina(dias).dias} días, {contarRutina(dias).ejercicios} ejercicios)
+                se reemplaza por la de HC ({contarRutina(rutinaHC).dias} días,{" "}
+                {contarRutina(rutinaHC).ejercicios} ejercicios). El historial de los ejercicios que
+                coincidan se conserva.
+              </div>
+              <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                <button onClick={() => { setRutinaHC(null); setMensaje(""); }} style={CONFIRM_BTN}>
+                  Cancelar
+                </button>
+                <button onClick={confirmarRutina} style={{ ...CONFIRM_BTN, color: C.sodio, borderColor: C.sodio }}>
+                  Traer igual
+                </button>
+              </div>
+            </div>
+          )}
+
+          <Boton tono="fantasma" alto={46} onClick={traerHistorial} style={{ opacity: cargando ? 0.5 : 1 }}>
+            Traer historial de HC
+          </Boton>
+
+          <div style={{ fontFamily: SANS, fontSize: 12, color: C.gris, lineHeight: 1.5 }}>
+            En un dispositivo nuevo: primero traé la rutina, después el historial.
+          </div>
+
           <button
             onClick={desconectar}
             style={{ background: "none", border: "none", color: C.gris, fontFamily: SANS, fontSize: 13, cursor: "pointer", textAlign: "left", padding: "4px 0" }}
@@ -450,7 +513,7 @@ function SyncPanel({ dias, restaurarDesdeHC }) {
 // ver actualizarCompartido en domain/rutina.js.
 const CAMPOS_COMPARTIDOS = new Set(["nombre", "peso", "incremento", "repsObjetivo"]);
 
-export function Ajustes({ dias, setDias, agregarEjercicioADia, restaurarDesdeHC, volver }) {
+export function Ajustes({ dias, setDias, agregarEjercicioADia, traerHistorialDeHC, aplicarRutinaDeHC, volver }) {
   const [agregandoEnDia, setAgregandoEnDia] = useState(null);
 
   const editar = (diaId, ejId, campo, valor) => {
@@ -543,7 +606,11 @@ export function Ajustes({ dias, setDias, agregarEjercicioADia, restaurarDesdeHC,
           </div>
         ))}
 
-        <SyncPanel dias={dias} restaurarDesdeHC={restaurarDesdeHC} />
+        <SyncPanel
+          dias={dias}
+          traerHistorialDeHC={traerHistorialDeHC}
+          aplicarRutinaDeHC={aplicarRutinaDeHC}
+        />
 
         <div style={{ marginTop: 28 }}>
           <Boton tono="fuerte" alto={54} onClick={volver}>

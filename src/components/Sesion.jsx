@@ -199,12 +199,13 @@ export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarCardio
       const rem = Math.max(0, Math.ceil((timerFin - Date.now()) / 1000));
       if (rem !== prevSeg.current) {
         prevSeg.current = rem;
-        setTimerSeg(rem);
         if (rem === 0) {
           navigator.vibrate?.([200, 100, 200]);
+          setTimerSeg(null);
           setTimerFin(null);
-        } else if (rem === 10 || rem === 5) {
-          navigator.vibrate?.(80);
+        } else {
+          setTimerSeg(rem);
+          if (rem === 10 || rem === 5) navigator.vibrate?.(80);
         }
       }
     };

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { storage, CLAVE_RUTINA } from "./storage";
 import { RUTINA_INICIAL, actualizarCompartido, vincularEjercicio, resincronizarCompartidos } from "./domain/rutina";
-import { leerToken, leerAutoSync, fetchSesiones, aplicarSesiones, pushSesiones, construirSesiones, pushRutina, fetchRutina, aplicarRutina } from "./sync/hcAdapter";
+import { leerToken, leerAutoSync, fetchSesiones, aplicarSesiones, pushSesiones, construirSesiones, fetchRutina, aplicarRutina } from "./sync/hcAdapter";
 import { progresar, aprender } from "./domain/progression";
 import { hoy } from "./utils/format";
 import { Marco } from "./components/Marco";
@@ -78,11 +78,9 @@ export default function App() {
     pushSesiones(token, construirSesiones(diasActualizados)).catch(() => {});
   };
 
-  const syncRutinaSilenciosa = (diasActualizados) => {
-    const token = leerToken();
-    if (!token || !leerAutoSync()) return;
-    pushRutina(token, diasActualizados).catch(() => {});
-  };
+  // La rutina NO se envía sola: pushRutina reemplaza lo que haya en HC, así
+  // que sólo sale desde el botón explícito de Ajustes. Auto-sync cubre las
+  // sesiones, que son aditivas.
 
   // sesion = { diaId, ejIdx: null | number, pesoActual, series, hechos, saltados }
   // ejIdx null → menú del día; number → ejercicio en curso
@@ -249,7 +247,7 @@ export default function App() {
         agregarEjercicioADia={agregarEjercicioADia}
         traerHistorialDeHC={traerHistorialDeHC}
         aplicarRutinaDeHC={aplicarRutinaDeHC}
-        volver={() => { syncRutinaSilenciosa(dias); setPantalla("inicio"); }}
+        volver={() => setPantalla("inicio")}
       />
     );
 

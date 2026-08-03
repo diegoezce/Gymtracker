@@ -15,6 +15,7 @@ import {
   pushSesiones,
   construirSesiones,
   fetchRutina,
+  pushRutina,
 } from "../sync/hcAdapter";
 
 /* ── componentes primitivos ── */
@@ -323,6 +324,12 @@ const contarRutina = (ds) => ({
   ejercicios: ds.reduce((n, d) => n + d.ejercicios.length, 0),
 });
 
+// "3 días, 17 ejercicios" / "1 día, 1 ejercicio"
+const resumenRutina = (ds) => {
+  const { dias: d, ejercicios: e } = contarRutina(ds);
+  return `${d} día${d !== 1 ? "s" : ""}, ${e} ejercicio${e !== 1 ? "s" : ""}`;
+};
+
 function SyncPanel({ dias, traerHistorialDeHC, aplicarRutinaDeHC }) {
   const [token, setToken] = useState(leerToken);
   const [usuario, setUsuario] = useState("");
@@ -330,7 +337,8 @@ function SyncPanel({ dias, traerHistorialDeHC, aplicarRutinaDeHC }) {
   const [estado, setEstado] = useState("idle");
   const [mensaje, setMensaje] = useState("");
   const [autoSync, setAutoSync] = useState(leerAutoSync);
-  const [rutinaHC, setRutinaHC] = useState(null); // bajada, esperando confirmación
+  const [rutinaHC, setRutinaHC] = useState(null); // bajada, esperando confirmación de traer
+  const [envioPendiente, setEnvioPendiente] = useState(null); // rutina remota que se pisaría al enviar
   const ultimaSync = localStorage.getItem(SYNC_KEY);
 
   function toggleAutoSync(v) {
@@ -394,11 +402,47 @@ function SyncPanel({ dias, traerHistorialDeHC, aplicarRutinaDeHC }) {
   }
 
   function confirmarRutina() {
-    const { dias: d, ejercicios: e } = contarRutina(rutinaHC);
+    const resumen = resumenRutina(rutinaHC);
     aplicarRutinaDeHC(rutinaHC);
     setRutinaHC(null);
     setEstado("ok");
-    setMensaje(`Rutina traída de HC: ${d} día${d !== 1 ? "s" : ""}, ${e} ejercicio${e !== 1 ? "s" : ""}.`);
+    setMensaje(`Rutina traída de HC: ${resumen}.`);
+  }
+
+  async function enviarRutina() {
+    const resumen = resumenRutina(dias);
+    await pushRutina(token, dias);
+    setEnvioPendiente(null);
+    setEstado("ok");
+    setMensaje(`Rutina enviada a HC: ${resumen}.`);
+  }
+
+  // pushRutina reemplaza lo que haya en HC, así que primero miramos qué hay
+  // del otro lado: si ya existe una rutina, pedimos confirmación.
+  async function pedirEnviarRutina() {
+    setEstado("cargando"); setMensaje(""); setEnvioPendiente(null);
+    try {
+      const { rutina } = await fetchRutina(token);
+      if (!rutina?.length) {
+        await enviarRutina(); // no hay nada que pisar
+        return;
+      }
+      setEnvioPendiente(rutina);
+      setEstado("idle");
+    } catch (e) {
+      if (e.message === "401") { localStorage.removeItem(TOKEN_KEY); setToken(null); }
+      setEstado("error"); setMensaje(e.message === "401" ? "Token expirado. Volvé a conectarte." : e.message);
+    }
+  }
+
+  async function confirmarEnvio() {
+    setEstado("cargando"); setMensaje("");
+    try {
+      await enviarRutina();
+    } catch (e) {
+      if (e.message === "401") { localStorage.removeItem(TOKEN_KEY); setToken(null); }
+      setEstado("error"); setMensaje(e.message === "401" ? "Token expirado. Volvé a conectarte." : e.message);
+    }
   }
 
   function desconectar() {
@@ -443,7 +487,9 @@ function SyncPanel({ dias, traerHistorialDeHC, aplicarRutinaDeHC }) {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: C.sup, border: `1px solid ${C.linea}`, borderRadius: 6, padding: "12px 14px" }}>
             <div>
               <div style={{ fontFamily: SANS, fontSize: 15, color: C.hueso }}>Sync automática</div>
-              <div style={{ fontFamily: SANS, fontSize: 12, color: C.gris, marginTop: 2 }}>Al cerrar cada sesión</div>
+              <div style={{ fontFamily: SANS, fontSize: 12, color: C.gris, marginTop: 2 }}>
+                Sube las sesiones al cerrar cada ejercicio
+              </div>
             </div>
             <Toggle activo={autoSync} onChange={toggleAutoSync} />
           </div>
@@ -465,10 +511,9 @@ function SyncPanel({ dias, traerHistorialDeHC, aplicarRutinaDeHC }) {
           {rutinaHC && (
             <div style={{ background: C.sup, border: `1px solid ${C.sodio}`, borderRadius: 6, padding: "12px 14px" }}>
               <div style={{ fontFamily: SANS, fontSize: 13, color: C.hueso, lineHeight: 1.5 }}>
-                Tu rutina local ({contarRutina(dias).dias} días, {contarRutina(dias).ejercicios} ejercicios)
-                se reemplaza por la de HC ({contarRutina(rutinaHC).dias} días,{" "}
-                {contarRutina(rutinaHC).ejercicios} ejercicios). El historial de los ejercicios que
-                coincidan se conserva.
+                Tu rutina local ({resumenRutina(dias)}) se reemplaza por la de HC (
+                {resumenRutina(rutinaHC)}). El historial de los ejercicios que coincidan se
+                conserva.
               </div>
               <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
                 <button onClick={() => { setRutinaHC(null); setMensaje(""); }} style={CONFIRM_BTN}>
@@ -481,12 +526,34 @@ function SyncPanel({ dias, traerHistorialDeHC, aplicarRutinaDeHC }) {
             </div>
           )}
 
+          <Boton tono="fantasma" alto={46} onClick={pedirEnviarRutina} style={{ opacity: cargando ? 0.5 : 1 }}>
+            Enviar rutina a HC
+          </Boton>
+
+          {envioPendiente && (
+            <div style={{ background: C.sup, border: `1px solid ${C.sodio}`, borderRadius: 6, padding: "12px 14px" }}>
+              <div style={{ fontFamily: SANS, fontSize: 13, color: C.hueso, lineHeight: 1.5 }}>
+                La rutina que hay en HC ({resumenRutina(envioPendiente)}) se reemplaza por la tuya
+                ({resumenRutina(dias)}).
+              </div>
+              <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                <button onClick={() => { setEnvioPendiente(null); setMensaje(""); }} style={CONFIRM_BTN}>
+                  Cancelar
+                </button>
+                <button onClick={confirmarEnvio} style={{ ...CONFIRM_BTN, color: C.sodio, borderColor: C.sodio }}>
+                  Enviar igual
+                </button>
+              </div>
+            </div>
+          )}
+
           <Boton tono="fantasma" alto={46} onClick={traerHistorial} style={{ opacity: cargando ? 0.5 : 1 }}>
             Traer historial de HC
           </Boton>
 
           <div style={{ fontFamily: SANS, fontSize: 12, color: C.gris, lineHeight: 1.5 }}>
             En un dispositivo nuevo: primero traé la rutina, después el historial.
+            La rutina sólo se envía cuando lo pedís acá.
           </div>
 
           <button

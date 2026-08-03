@@ -210,7 +210,7 @@ export function Progreso({ dias, volver }) {
               </div>
 
               <div style={{ marginTop: 14 }}>
-                <Etiqueta>Volumen por sesión (kg totales)</Etiqueta>
+                <Etiqueta>Volumen por sesión (tonelaje)</Etiqueta>
                 <div style={{ marginTop: 8, background: C.sup, border: `1px solid ${C.linea}`, borderRadius: 4, padding: "12px 8px 4px" }}>
                   <Grafico datos={volData} color={C.verde} />
                 </div>

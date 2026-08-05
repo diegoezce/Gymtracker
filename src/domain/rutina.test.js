@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   ejercicio,
   ejercicioCardio,
+  ejercicioTiempo,
   actualizarCompartido,
   vincularEjercicio,
   ejerciciosVinculables,
@@ -260,5 +261,75 @@ describe("moverEjercicioOrden", () => {
     const conOtroDia = [...dias, { id: "b", nombre: "Día B", ejercicios: [otro] }];
     const resultado = moverEjercicioOrden(conOtroDia, "a", e2.id, -1);
     expect(resultado[1].ejercicios).toEqual(conOtroDia[1].ejercicios);
+  });
+});
+
+describe("ejercicioTiempo", () => {
+  it("trae los defaults del ejemplo (30s x 3 series, 60s descanso, +5s)", () => {
+    const plancha = ejercicioTiempo("Plancha");
+    expect(plancha.tipo).toBe("tiempo");
+    expect(plancha.duracionObjetivo).toBe(30);
+    expect(plancha.series).toBe(3);
+    expect(plancha.descanso).toBe(60);
+    expect(plancha.incremento).toBe(5);
+    expect(plancha.historial).toEqual([]);
+    expect(plancha.peso).toBeUndefined();
+    expect(plancha.ajustes).toBeUndefined();
+  });
+});
+
+describe("vincularEjercicio con tipo tiempo", () => {
+  it("usa series/descanso propios del día destino, sin repsMin/repsMax", () => {
+    const plancha = ejercicioTiempo("Plancha", 30, 3, 60, 5);
+    const dias = [
+      { id: "a", nombre: "Día A", ejercicios: [plancha] },
+      { id: "b", nombre: "Día B", ejercicios: [] },
+    ];
+    const resultado = vincularEjercicio(dias, plancha, "b", { series: 4, descanso: 45 });
+    const copia = resultado[1].ejercicios[0];
+    expect(copia.id).toBe(plancha.id);
+    expect(copia.duracionObjetivo).toBe(30);
+    expect(copia.series).toBe(4);
+    expect(copia.descanso).toBe(45);
+    expect(copia.repsMin).toBeUndefined();
+  });
+
+  it("usa defaults propios (series 3, descanso 60) si no se especifica configDia", () => {
+    const plancha = ejercicioTiempo("Plancha", 30, 3, 60, 5);
+    const dias = [
+      { id: "a", nombre: "Día A", ejercicios: [plancha] },
+      { id: "b", nombre: "Día B", ejercicios: [] },
+    ];
+    const resultado = vincularEjercicio(dias, plancha, "b");
+    expect(resultado[1].ejercicios[0].series).toBe(3);
+    expect(resultado[1].ejercicios[0].descanso).toBe(60);
+  });
+});
+
+describe("resincronizarCompartidos con tipo tiempo", () => {
+  it("mergea duracionObjetivo e incremento entre copias compartidas", () => {
+    const plancha = ejercicioTiempo("Plancha", 30, 3, 60, 5);
+    let dias = [
+      { id: "a", nombre: "Día A", ejercicios: [plancha] },
+      { id: "b", nombre: "Día B", ejercicios: [] },
+    ];
+    dias = vincularEjercicio(dias, plancha, "b");
+    dias = dias.map((d, i) => ({
+      ...d,
+      ejercicios: d.ejercicios.map((e) => ({
+        ...e,
+        duracionObjetivo: i === 0 ? 30 : 35,
+        historial:
+          i === 0
+            ? [{ fecha: "2026-07-01", series: [{ segundos: 30 }] }]
+            : [{ fecha: "2026-07-10", series: [{ segundos: 35 }] }],
+      })),
+    }));
+
+    const resultado = resincronizarCompartidos(dias);
+    expect(resultado[0].ejercicios[0].duracionObjetivo).toBe(35);
+    expect(resultado[1].ejercicios[0].duracionObjetivo).toBe(35);
+    expect(resultado[0].ejercicios[0].historial).toEqual(resultado[1].ejercicios[0].historial);
+    expect(resultado[0].ejercicios[0].historial.map((h) => h.fecha)).toEqual(["2026-07-01", "2026-07-10"]);
   });
 });

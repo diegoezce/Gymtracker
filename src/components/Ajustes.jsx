@@ -218,6 +218,11 @@ function CabeceraCard({ ej, diaId, dias, idx, total, onEditar, onQuitar, onMover
             CARDIO
           </span>
         )}
+        {ej.tipo === "tiempo" && (
+          <span style={{ fontFamily: SANS, fontSize: 11, color: C.sodio, background: "#1a2a1a", borderRadius: 3, padding: "2px 6px", flexShrink: 0 }}>
+            TIEMPO
+          </span>
+        )}
         <OrdenBotones idx={idx} total={total} onMover={(dir) => onMoverOrden(diaId, ej.id, dir)} />
         <button onClick={intentarQuitar} style={QUITAR_BTN}>×</button>
       </div>
@@ -285,6 +290,70 @@ function TarjetaCardio({ ej, diaId, dias, idx, total, onEditar, onQuitar, onMove
             </div>
           )}
         </>
+      )}
+    </div>
+  );
+}
+
+function TarjetaTiempo({ ej, diaId, dias, idx, total, onEditar, onQuitar, onMover, onMoverOrden }) {
+  const [abierto, setAbierto] = useState(false);
+  const e = (campo, valor) => onEditar(diaId, ej.id, campo, valor);
+
+  return (
+    <div style={{ background: C.sup, border: `1px solid ${C.linea}`, borderRadius: 6, marginBottom: 8, overflow: "hidden" }}>
+      <CabeceraCard ej={ej} diaId={diaId} dias={dias} idx={idx} total={total} onEditar={onEditar} onQuitar={onQuitar} onMoverOrden={onMoverOrden} />
+
+      {/* fila principal: series · objetivo · descanso */}
+      <div style={{ padding: "0 14px 12px", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+        <div>
+          <Label>Series</Label>
+          <NumInput value={ej.series} onChange={(v) => e("series", v)} min={1} />
+        </div>
+        <div>
+          <Label>Objetivo (s)</Label>
+          <NumInput value={ej.duracionObjetivo} onChange={(v) => e("duracionObjetivo", v)} step={5} min={5} />
+        </div>
+        <div>
+          <Label>Descanso</Label>
+          <NumInput value={ej.descanso} onChange={(v) => e("descanso", v)} step={15} />
+        </div>
+      </div>
+
+      {/* avanzado (colapsable) */}
+      <button
+        onClick={() => setAbierto((a) => !a)}
+        style={{ width: "100%", background: "none", border: "none", borderTop: `1px solid ${C.linea}`, color: C.gris, fontFamily: SANS, fontSize: 12, padding: "8px 14px", cursor: "pointer", textAlign: "left", display: "flex", justifyContent: "space-between" }}
+      >
+        <span>Incremento{dias.length > 1 ? " · mover" : ""}</span>
+        <span>{abierto ? "▲" : "▼"}</span>
+      </button>
+
+      {abierto && (
+        <div style={{ padding: "12px 14px 14px", borderTop: `1px solid ${C.linea}`, display: "flex", flexDirection: "column", gap: 10 }}>
+          <div>
+            <Label>Incremento (s)</Label>
+            <NumInput value={ej.incremento} onChange={(v) => e("incremento", v)} step={5} min={5} />
+          </div>
+
+          {dias.length > 1 && (
+            <div>
+              <Label>Mover a otro día</Label>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {dias
+                  .filter((d) => d.id !== diaId)
+                  .map((d) => (
+                    <button
+                      key={d.id}
+                      onClick={() => onMover(diaId, ej.id, d.id)}
+                      style={{ background: "none", border: `1px solid ${C.linea}`, borderRadius: 4, color: C.gris, fontFamily: SANS, fontSize: 13, padding: "6px 12px", cursor: "pointer" }}
+                    >
+                      → {d.nombre}
+                    </button>
+                  ))}
+              </div>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
@@ -365,9 +434,9 @@ function TarjetaFuerza({ ej, diaId, dias, idx, total, onEditar, onQuitar, onMove
 }
 
 function TarjetaEjercicio(props) {
-  return props.ej.tipo === "cardio"
-    ? <TarjetaCardio {...props} />
-    : <TarjetaFuerza {...props} />;
+  if (props.ej.tipo === "cardio") return <TarjetaCardio {...props} />;
+  if (props.ej.tipo === "tiempo") return <TarjetaTiempo {...props} />;
+  return <TarjetaFuerza {...props} />;
 }
 
 /* ── panel de sync ── */
@@ -631,7 +700,7 @@ function SyncPanel({ dias, traerHistorialDeHC, aplicarRutinaDeHC }) {
 
 // Campos compartidos entre copias del mismo ejercicio en distintos días —
 // ver actualizarCompartido en domain/rutina.js.
-const CAMPOS_COMPARTIDOS = new Set(["nombre", "peso", "incremento", "repsObjetivo"]);
+const CAMPOS_COMPARTIDOS = new Set(["nombre", "peso", "incremento", "repsObjetivo", "duracionObjetivo"]);
 
 export function Ajustes({ dias, setDias, agregarEjercicioADia, traerHistorialDeHC, aplicarRutinaDeHC, volver }) {
   const [agregandoEnDia, setAgregandoEnDia] = useState(null);

@@ -152,3 +152,30 @@ describe("aprender", () => {
     expect(aviso).toBe("");
   });
 });
+
+describe("progresar con tipo tiempo", () => {
+  function plancha(overrides = {}) {
+    return { tipo: "tiempo", duracionObjetivo: 30, incremento: 5, historial: [], ...overrides };
+  }
+
+  it("sube el objetivo un incremento si todas las rondas llegan o superan", () => {
+    const series = [{ segundos: 30 }, { segundos: 32 }, { segundos: 30 }];
+    const { duracionObjetivo, nota } = progresar(plancha(), series);
+    expect(duracionObjetivo).toBe(35);
+    expect(nota).toMatch(/Todas al tope/);
+  });
+
+  it("repite el mismo objetivo si alguna ronda no llega", () => {
+    const series = [{ segundos: 30 }, { segundos: 25 }, { segundos: 30 }];
+    const { duracionObjetivo, nota } = progresar(plancha(), series);
+    expect(duracionObjetivo).toBe(30);
+    expect(nota).toMatch(/Repetimos 30s/);
+  });
+});
+
+describe("aprender con tipo cardio/tiempo", () => {
+  it("no cambia nada para cardio ni tiempo", () => {
+    expect(aprender({ tipo: "cardio" }, 100)).toEqual({ ajustes: [], incremento: 0, aviso: "" });
+    expect(aprender({ tipo: "tiempo", incremento: 5 }, 30)).toEqual({ ajustes: [], incremento: 5, aviso: "" });
+  });
+});

@@ -1,7 +1,11 @@
 import { useState } from "react";
 import { C, MONO, SANS } from "../theme";
 import { campo } from "../styles/helpers";
-import { ejercicio as nuevoEjercicioFactory, ejercicioCardio as nuevoCardioFactory } from "../domain/rutina";
+import {
+  ejercicio as nuevoEjercicioFactory,
+  ejercicioCardio as nuevoCardioFactory,
+  ejercicioTiempo as nuevoTiempoFactory,
+} from "../domain/rutina";
 import { fmt } from "../utils/format";
 import { Marco } from "./Marco";
 import { Cabecera } from "./Cabecera";
@@ -45,6 +49,8 @@ export function SelectorEjercicio({ candidatos, onSeleccionar, onCrearNuevo, vol
     const ej =
       tipo === "cardio"
         ? nuevoCardioFactory(nombre.trim())
+        : tipo === "tiempo"
+        ? nuevoTiempoFactory(nombre.trim())
         : nuevoEjercicioFactory(nombre.trim(), 20, 2.5, 3, 8, 12, 90);
     onCrearNuevo(ej);
   };
@@ -73,7 +79,12 @@ export function SelectorEjercicio({ candidatos, onSeleccionar, onCrearNuevo, vol
                 <button key={e.id} onClick={() => onSeleccionar(e)} style={tarjeta}>
                   <div style={{ fontFamily: SANS, fontSize: 16, fontWeight: 600, color: C.hueso }}>{e.nombre}</div>
                   <div style={{ fontFamily: MONO, fontSize: 12, color: C.gris, marginTop: 4 }}>
-                    {e.tipo === "cardio" ? "Cardio" : `${fmt(e.peso)} kg`} · también en {e.diasDonde.join(", ")}
+                    {e.tipo === "cardio"
+                      ? "Cardio"
+                      : e.tipo === "tiempo"
+                      ? `${e.duracionObjetivo}s`
+                      : `${fmt(e.peso)} kg`}{" "}
+                    · también en {e.diasDonde.join(", ")}
                   </div>
                 </button>
               ))}
@@ -93,6 +104,9 @@ export function SelectorEjercicio({ candidatos, onSeleccionar, onCrearNuevo, vol
               </button>
               <button onClick={() => setTipo("cardio")} style={tab(tipo === "cardio")}>
                 Cardio
+              </button>
+              <button onClick={() => setTipo("tiempo")} style={tab(tipo === "tiempo")}>
+                Tiempo
               </button>
             </div>
             <div style={{ marginTop: 20 }}>

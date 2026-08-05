@@ -116,6 +116,10 @@ export function DiaMenu({
                       <span style={{ ...ESTADO_DER, color: C.gris }}>
                         {e.duracionMin} min
                       </span>
+                    ) : e.tipo === "tiempo" ? (
+                      <span style={{ ...ESTADO_DER, color: C.gris }}>
+                        {e.duracionObjetivo}s
+                      </span>
                     ) : (
                       <span style={{ ...ESTADO_DER, color: C.gris }}>
                         {fmt(e.peso)} kg
@@ -127,6 +131,8 @@ export function DiaMenu({
                       ? `Cardio${e.distanciaKm ? ` · ${e.distanciaKm} km` : ""}`
                       : parcial
                       ? `${parcial.series.length} de ${e.series} series hechas`
+                      : e.tipo === "tiempo"
+                      ? `${e.series} × ${e.duracionObjetivo}s${e.descanso ? ` · ${e.descanso}s descanso` : ""}`
                       : `${e.series} × ${e.repsMax ? `${e.repsMin}–${e.repsMax}` : e.repsObjetivo} reps${e.descanso ? ` · ${e.descanso}s` : ""}`}
                   </div>
                   <div style={{ fontFamily: MONO, fontSize: 11, color: C.gris, marginTop: 3, opacity: 0.75 }}>

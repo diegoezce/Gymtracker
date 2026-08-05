@@ -67,6 +67,11 @@ export function aplicarSesiones(dias, sesiones) {
         .sort((a, b) => a.fecha.localeCompare(b.fecha))
         .slice(-40);
       const ultimaSerie = historial[historial.length - 1]?.series;
+      if (ej.tipo === "tiempo") {
+        const ultimoObjetivo =
+          ultimaSerie?.length ? Math.max(...ultimaSerie.map((s) => s.segundos)) : ej.duracionObjetivo;
+        return { ...ej, historial, duracionObjetivo: historial.length > 0 ? ultimoObjetivo : ej.duracionObjetivo };
+      }
       const ultimoPeso =
         ultimaSerie?.length ? Math.max(...ultimaSerie.map((s) => s.peso)) : ej.peso;
       return { ...ej, historial, peso: historial.length > 0 ? ultimoPeso : ej.peso };
@@ -130,11 +135,23 @@ export function construirSesiones(dias) {
           if (e.tipo === "cardio") {
             return { nombre: e.nombre, tipo: "cardio", duracion: entrada.duracion, distancia: entrada.distancia, series: [] };
           }
+          if (e.tipo === "tiempo") {
+            return { nombre: e.nombre, tipo: "tiempo", series: entrada.series };
+          }
           return { nombre: e.nombre, series: entrada.series };
         })
         .filter(Boolean);
+      // Sólo suma series con peso/reps (fuerza) — una serie de tiempo
+      // ({segundos}, sin esos campos) daría NaN, y como la suma es
+      // contagiosa el volumen de toda la sesión quedaría NaN apenas
+      // hubiera un ejercicio de tiempo ese día.
       const volumen_kg = ejercicios.reduce(
-        (sum, e) => sum + (e.series?.reduce((s, serie) => s + serie.peso * serie.reps, 0) ?? 0),
+        (sum, e) =>
+          sum +
+          (e.series?.reduce(
+            (s, serie) => s + (serie.peso != null && serie.reps != null ? serie.peso * serie.reps : 0),
+            0
+          ) ?? 0),
         0
       );
       const duracion_min = ejercicios

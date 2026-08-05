@@ -183,6 +183,31 @@ export function Progreso({ dias, volver }) {
             );
           }
 
+          if (e.tipo === "tiempo") {
+            const segData = e.historial.map((h) => ({
+              fecha: h.fecha,
+              valor: h.series?.length ? Math.max(...h.series.map((s) => s.segundos)) : 0,
+            }));
+            const maxSeg = Math.max(...segData.map((d) => d.valor));
+            const ultima = e.historial[e.historial.length - 1];
+
+            return (
+              <div key={e.id}>
+                {cabecera}
+                <div style={{ fontFamily: MONO, fontSize: 13, color: C.gris, marginBottom: 14 }}>
+                  <span style={{ color: C.sodio, fontWeight: 700 }}>Máx {maxSeg}s</span>
+                  <span> · {e.historial.length} sesión{e.historial.length !== 1 ? "es" : ""}</span>
+                  {ultima && <span> · última {fechaCorta(ultima.fecha)}</span>}
+                </div>
+
+                <Etiqueta>Segundos máximos</Etiqueta>
+                <div style={{ marginTop: 8, background: C.sup, border: `1px solid ${C.linea}`, borderRadius: 4, padding: "12px 8px 4px" }}>
+                  <Grafico datos={segData} color={C.sodio} />
+                </div>
+              </div>
+            );
+          }
+
           const pesoData = e.historial.map((h) => ({
             fecha: h.fecha,
             valor: h.series?.length ? Math.max(...h.series.map((s) => s.peso)) : 0,

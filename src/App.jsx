@@ -137,6 +137,27 @@ export default function App() {
     setSesion({ ...sesion, ejIdx: null, series: [], hechos: { ...sesion.hechos, [ej.id]: true } });
   };
 
+  const guardarSerieTiempo = (segundos) => {
+    const series = [...sesion.series, { segundos }];
+    if (series.length < ej.series) {
+      setSesion({ ...sesion, series });
+      return;
+    }
+    cerrarEjercicioTiempo(series);
+  };
+
+  const cerrarEjercicioTiempo = (series) => {
+    const { duracionObjetivo, nota } = progresar(ej, series);
+    const nuevos = actualizarCompartido(dias, ej.id, {
+      duracionObjetivo,
+      historial: [...ej.historial, { fecha: hoy(), series }].slice(-40),
+    });
+    setDias(nuevos);
+    setAviso(nota);
+    syncSilencioso(nuevos);
+    setSesion({ ...sesion, ejIdx: null, series: [], hechos: { ...sesion.hechos, [ej.id]: true } });
+  };
+
   // Vuelve al menú: guarda series parciales + timerFin en sesion.progreso (no en historial)
   const volverAlMenu = (timerFinActual = null) => {
     const nuevoProg = { ...sesion.progreso };
@@ -231,10 +252,13 @@ export default function App() {
         sesion={sesion}
         setSesion={setSesion}
         guardarSerie={guardarSerie}
+        guardarSerieTiempo={guardarSerieTiempo}
         guardarCardio={guardarCardio}
         initialTimerFin={sesion.progreso?.[ej.id]?.timerFin ?? null}
         salir={volverAlMenu}
-        terminarEjercicio={() => cerrarEjercicio(sesion.series)}
+        terminarEjercicio={() =>
+          ej.tipo === "tiempo" ? cerrarEjercicioTiempo(sesion.series) : cerrarEjercicio(sesion.series)
+        }
       />
     );
   }

@@ -27,13 +27,28 @@ export const ejercicioCardio = (nombre, duracionMin = 30, distanciaKm = null) =>
   historial: [],
 });
 
+// Series por tiempo (planchas, isométricos): cada serie es una ronda
+// sostenida `duracionObjetivo` segundos. Sin peso ni ajustes — no hay
+// override manual que aprender en esta primera versión.
+// historial: [{ fecha, series: [{ segundos }] }]
+export const ejercicioTiempo = (nombre, duracionObjetivo = 30, series = 3, descanso = 60, incremento = 5) => ({
+  id: genId(nombre),
+  tipo: "tiempo",
+  nombre,
+  duracionObjetivo,
+  series,
+  descanso,
+  incremento,
+  historial: [],
+});
+
 // ── ejercicios compartidos entre días ──────────────────────────
 // Dos ejercicios en días distintos con el mismo `id` se consideran el
 // mismo movimiento: peso/incremento/repsObjetivo/ajustes/historial se
 // mantienen sincronizados entre copias. Series/reps/descanso (o
 // duración/distancia en cardio) quedan libres para variar por día.
 
-const CAMPOS_COMPARTIDOS = ["id", "tipo", "nombre", "peso", "incremento", "repsObjetivo", "ajustes", "historial"];
+const CAMPOS_COMPARTIDOS = ["id", "tipo", "nombre", "peso", "incremento", "repsObjetivo", "duracionObjetivo", "ajustes", "historial"];
 
 function camposCompartidos(ej) {
   const out = {};
@@ -102,6 +117,8 @@ export function vincularEjercicio(dias, ejFuente, diaDestinoId, configDia = {}) 
   const configDefault =
     ejFuente.tipo === "cardio"
       ? { duracionMin: ejFuente.duracionMin ?? 30, distanciaKm: ejFuente.distanciaKm ?? null }
+      : ejFuente.tipo === "tiempo"
+      ? { series: ejFuente.series ?? 3, descanso: ejFuente.descanso ?? 60 }
       : {
           series: ejFuente.series ?? 3,
           repsMin: ejFuente.repsMin ?? 8,
@@ -153,6 +170,8 @@ export function resincronizarCompartidos(dias) {
     mergeados[id] =
       ejs[0].tipo === "cardio"
         ? { historial }
+        : ejs[0].tipo === "tiempo"
+        ? { historial, duracionObjetivo: masReciente.duracionObjetivo, incremento: masReciente.incremento }
         : {
             historial,
             peso: masReciente.peso,

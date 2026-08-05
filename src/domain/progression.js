@@ -13,6 +13,14 @@ import { fmt } from "../utils/format";
  */
 export function progresar(ej, seriesHechas) {
   if (ej.tipo === "cardio") return { peso: 0, repsObjetivo: 0, nota: "" };
+  if (ej.tipo === "tiempo") {
+    const todasAlTope = seriesHechas.every((s) => s.segundos >= ej.duracionObjetivo);
+    const duracionObjetivo = todasAlTope ? ej.duracionObjetivo + ej.incremento : ej.duracionObjetivo;
+    const nota = todasAlTope
+      ? `Todas al tope. Próxima: ${duracionObjetivo}s.`
+      : `Repetimos ${ej.duracionObjetivo}s.`;
+    return { duracionObjetivo, nota };
+  }
   const inc = ej.incremento;
   let peso = ej.peso;
   let repsObjetivo = ej.repsObjetivo;
@@ -63,7 +71,7 @@ export function progresar(ej, seriesHechas) {
  * @param {number} pesoUsado
  */
 export function aprender(ej, pesoUsado) {
-  if (ej.tipo === "cardio") return { ajustes: [], incremento: 0, aviso: "" };
+  if (ej.tipo === "cardio" || ej.tipo === "tiempo") return { ajustes: [], incremento: ej.incremento ?? 0, aviso: "" };
   const delta = pesoUsado - ej.peso;
   if (Math.abs(delta) < 0.01) return { ajustes: [], incremento: ej.incremento, aviso: "" };
   const ajustes = [...(ej.ajustes || []), Math.sign(delta)].slice(-3);

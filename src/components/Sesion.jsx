@@ -6,6 +6,7 @@ import { Marco } from "./Marco";
 import { Cabecera } from "./Cabecera";
 import { Etiqueta } from "./Etiqueta";
 import { Repeticiones } from "./Repeticiones";
+import { TiempoInput } from "./TiempoInput";
 import { Boton } from "./Boton";
 
 const R = 54;
@@ -155,7 +156,7 @@ function SesionCardio({ ej, guardarCardio, salir }) {
 
 /* ── sesión principal ── */
 
-export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarCardio, initialTimerFin = null, salir, terminarEjercicio }) {
+export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarSerieTiempo, guardarCardio, initialTimerFin = null, salir, terminarEjercicio }) {
   // Restore timer from saved state if returning to an exercise mid-session
   const validoInicial = initialTimerFin && initialTimerFin > Date.now() ? initialTimerFin : null;
   const [timerFin, setTimerFin] = useState(validoInicial);
@@ -167,6 +168,7 @@ export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarCardio
   const mountHandled = useRef(false);
 
   const hayMasSeries = sesion.series.length > 0 && sesion.series.length < ej.series;
+  const esTiempo = ej.tipo === "tiempo";
 
   // Re-schedule SW notification when mounting with a restored timer
   useEffect(() => {
@@ -242,35 +244,41 @@ export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarCardio
           </h1>
           <Etiqueta>
             Serie {sesion.series.length + 1} de {ej.series} · objetivo{" "}
-            {ej.repsMax ? `${ej.repsObjetivo}–${ej.repsMax}` : ej.repsObjetivo} reps
+            {esTiempo
+              ? `${ej.duracionObjetivo}s`
+              : `${ej.repsMax ? `${ej.repsObjetivo}–${ej.repsMax}` : ej.repsObjetivo} reps`}
             {ej.descanso ? ` · ${ej.descanso}s descanso` : ""}
           </Etiqueta>
 
-          <div style={{ margin: "28px 0 8px", border: `1px solid ${C.linea}`, borderRadius: 4, overflow: "hidden", background: C.sup }}>
-            <div style={{ padding: "22px 0 14px", textAlign: "center" }}>
-              <div style={{ fontFamily: MONO, fontSize: 76, fontWeight: 700, letterSpacing: "-0.04em", color: C.sodio, lineHeight: 1 }}>
-                {fmt(sesion.pesoActual)}
+          {!esTiempo && (
+            <div style={{ margin: "28px 0 8px", border: `1px solid ${C.linea}`, borderRadius: 4, overflow: "hidden", background: C.sup }}>
+              <div style={{ padding: "22px 0 14px", textAlign: "center" }}>
+                <div style={{ fontFamily: MONO, fontSize: 76, fontWeight: 700, letterSpacing: "-0.04em", color: C.sodio, lineHeight: 1 }}>
+                  {fmt(sesion.pesoActual)}
+                </div>
+                <div style={{ marginTop: 6 }}><Etiqueta>kilos</Etiqueta></div>
               </div>
-              <div style={{ marginTop: 6 }}><Etiqueta>kilos</Etiqueta></div>
+              <div style={{ display: "flex", borderTop: `1px solid ${C.linea}` }}>
+                <button
+                  onClick={() => setSesion({ ...sesion, pesoActual: Math.max(0, sesion.pesoActual - ej.incremento) })}
+                  style={barra("left")}
+                >
+                  −{fmt(ej.incremento)}
+                </button>
+                <button
+                  onClick={() => setSesion({ ...sesion, pesoActual: sesion.pesoActual + ej.incremento })}
+                  style={barra("right")}
+                >
+                  +{fmt(ej.incremento)}
+                </button>
+              </div>
             </div>
-            <div style={{ display: "flex", borderTop: `1px solid ${C.linea}` }}>
-              <button
-                onClick={() => setSesion({ ...sesion, pesoActual: Math.max(0, sesion.pesoActual - ej.incremento) })}
-                style={barra("left")}
-              >
-                −{fmt(ej.incremento)}
-              </button>
-              <button
-                onClick={() => setSesion({ ...sesion, pesoActual: sesion.pesoActual + ej.incremento })}
-                style={barra("right")}
-              >
-                +{fmt(ej.incremento)}
-              </button>
-            </div>
-          </div>
+          )}
 
           {timerSeg !== null ? (
             <TimerDescanso segundos={timerSeg} total={ej.descanso} onSaltar={saltarTimer} />
+          ) : esTiempo ? (
+            <TiempoInput objetivo={ej.duracionObjetivo} onGuardar={guardarSerieTiempo} series={sesion.series} />
           ) : (
             <Repeticiones objetivo={ej.repsObjetivo} onGuardar={guardarSerie} series={sesion.series} />
           )}
@@ -308,7 +316,7 @@ export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarCardio
                       >
                         <span style={{ fontFamily: MONO, fontSize: 14, color: C.gris }}>{i + 1}</span>
                         <span style={{ fontFamily: MONO, fontSize: 15, color: C.hueso }}>
-                          {fmt(s.peso)} kg × {s.reps} reps
+                          {esTiempo ? `${s.segundos}s` : `${fmt(s.peso)} kg × ${s.reps} reps`}
                         </span>
                         <span style={{ fontFamily: MONO, fontSize: 12, color: editando ? C.sodio : C.gris }}>
                           {editando ? "cerrar" : "editar"}
@@ -316,7 +324,25 @@ export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarCardio
                       </button>
 
                       {/* panel de edición */}
-                      {editando && (
+                      {editando && esTiempo && (
+                        <div style={{ padding: "12px 14px 14px", borderTop: `1px solid ${C.linea}` }}>
+                          <div style={{ fontFamily: SANS, fontSize: 11, color: C.gris, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Segundos</div>
+                          <div style={{ display: "flex", border: `1px solid ${C.linea}`, borderRadius: 4, overflow: "hidden" }}>
+                            <button
+                              onClick={() => editarSerie(i, "segundos", Math.max(5, s.segundos - 5))}
+                              style={{ ...barra("left"), fontSize: 18, color: C.gris }}
+                            >−5</button>
+                            <div style={{ flex: 1, textAlign: "center", fontFamily: MONO, fontSize: 26, fontWeight: 700, color: C.sodio, padding: "10px 0" }}>
+                              {s.segundos}
+                            </div>
+                            <button
+                              onClick={() => editarSerie(i, "segundos", s.segundos + 5)}
+                              style={{ ...barra("right"), fontSize: 18, color: C.gris }}
+                            >+5</button>
+                          </div>
+                        </div>
+                      )}
+                      {editando && !esTiempo && (
                         <div style={{ padding: "12px 14px 14px", borderTop: `1px solid ${C.linea}` }}>
                           {/* peso */}
                           <div style={{ marginBottom: 12 }}>

@@ -627,6 +627,11 @@ const CAMPOS_COMPARTIDOS = new Set(["nombre", "peso", "incremento", "repsObjetiv
 export function Ajustes({ dias, setDias, agregarEjercicioADia, traerHistorialDeHC, aplicarRutinaDeHC, volver }) {
   const [agregandoEnDia, setAgregandoEnDia] = useState(null);
   const [confirmandoQuitarDia, setConfirmandoQuitarDia] = useState(null);
+  // Colapsado por default (la lista de días se hace larga); un día recién
+  // creado se abre solo, para poder cargarle ejercicios sin un tap extra.
+  const [colapsados, setColapsados] = useState({});
+  const estaColapsado = (diaId) => colapsados[diaId] ?? true;
+  const toggleColapsado = (diaId) => setColapsados((c) => ({ ...c, [diaId]: !estaColapsado(diaId) }));
 
   const editar = (diaId, ejId, campo, valor) => {
     if (CAMPOS_COMPARTIDOS.has(campo)) {
@@ -656,7 +661,11 @@ export function Ajustes({ dias, setDias, agregarEjercicioADia, traerHistorialDeH
   const moverOrden = (diaId, ejId, direccion) =>
     setDias(moverEjercicioOrden(dias, diaId, ejId, direccion));
 
-  const agregarDia = () => setDias([...dias, crearDia("Nuevo día")]);
+  const agregarDia = () => {
+    const nuevo = crearDia("Nuevo día");
+    setDias([...dias, nuevo]);
+    setColapsados((c) => ({ ...c, [nuevo.id]: false }));
+  };
 
   const quitarDia = (diaId) => {
     setConfirmandoQuitarDia(null);
@@ -690,10 +699,18 @@ export function Ajustes({ dias, setDias, agregarEjercicioADia, traerHistorialDeH
       <Cabecera izq="Ajustes" onSalir={volver} />
       <div style={{ padding: "12px 20px 60px" }}>
 
-        {dias.map((d) => (
+        {dias.map((d) => {
+          const colapsado = estaColapsado(d.id);
+          return (
           <div key={d.id} style={{ marginBottom: 32 }}>
             {/* nombre del día */}
-            <div style={{ marginBottom: 12, borderBottom: `1px solid ${C.linea}`, paddingBottom: 8, display: "flex", gap: 10, alignItems: "center" }}>
+            <div style={{ marginBottom: 12, borderBottom: `1px solid ${C.linea}`, paddingBottom: 8, display: "flex", gap: 4, alignItems: "center" }}>
+              <button
+                onClick={() => toggleColapsado(d.id)}
+                style={{ background: "none", border: "none", color: C.gris, fontFamily: "ui-monospace, monospace", fontSize: 13, width: 26, height: 26, flexShrink: 0, cursor: "pointer" }}
+              >
+                {colapsado ? "▶" : "▼"}
+              </button>
               <input
                 value={d.nombre}
                 onChange={(e) => setDias(dias.map((x) => (x.id === d.id ? { ...x, nombre: e.target.value } : x)))}
@@ -707,8 +724,14 @@ export function Ajustes({ dias, setDias, agregarEjercicioADia, traerHistorialDeH
                   fontWeight: 700,
                   outline: "none",
                   padding: "4px 0",
+                  minWidth: 0,
                 }}
               />
+              {colapsado && (
+                <span style={{ fontFamily: MONO, fontSize: 12, color: C.gris, flexShrink: 0 }}>
+                  {d.ejercicios.length} ejercicio{d.ejercicios.length !== 1 ? "s" : ""}
+                </span>
+              )}
               {dias.length > 1 && (
                 <button onClick={() => intentarQuitarDia(d.id)} style={QUITAR_BTN}>×</button>
               )}
@@ -733,30 +756,35 @@ export function Ajustes({ dias, setDias, agregarEjercicioADia, traerHistorialDeH
               </div>
             )}
 
-            {/* ejercicios */}
-            {d.ejercicios.map((e, idx) => (
-              <TarjetaEjercicio
-                key={e.id}
-                ej={e}
-                diaId={d.id}
-                dias={dias}
-                idx={idx}
-                total={d.ejercicios.length}
-                onEditar={editar}
-                onQuitar={quitarEjercicio}
-                onMover={moverEjercicio}
-                onMoverOrden={moverOrden}
-              />
-            ))}
+            {!colapsado && (
+              <>
+                {/* ejercicios */}
+                {d.ejercicios.map((e, idx) => (
+                  <TarjetaEjercicio
+                    key={e.id}
+                    ej={e}
+                    diaId={d.id}
+                    dias={dias}
+                    idx={idx}
+                    total={d.ejercicios.length}
+                    onEditar={editar}
+                    onQuitar={quitarEjercicio}
+                    onMover={moverEjercicio}
+                    onMoverOrden={moverOrden}
+                  />
+                ))}
 
-            <button
-              onClick={() => setAgregandoEnDia(d.id)}
-              style={{ width: "100%", background: "none", border: `1px dashed ${C.linea}`, borderRadius: 6, color: C.gris, fontFamily: SANS, fontSize: 14, padding: "13px 0", cursor: "pointer" }}
-            >
-              + Agregar ejercicio
-            </button>
+                <button
+                  onClick={() => setAgregandoEnDia(d.id)}
+                  style={{ width: "100%", background: "none", border: `1px dashed ${C.linea}`, borderRadius: 6, color: C.gris, fontFamily: SANS, fontSize: 14, padding: "13px 0", cursor: "pointer" }}
+                >
+                  + Agregar ejercicio
+                </button>
+              </>
+            )}
           </div>
-        ))}
+          );
+        })}
 
         <button
           onClick={agregarDia}

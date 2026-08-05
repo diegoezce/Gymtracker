@@ -1,6 +1,14 @@
 import { useState } from "react";
 import { C, MONO, SANS } from "../theme";
-import { actualizarCompartido, diasDondeAparece, ejerciciosVinculables, quitarPierdeHistorial } from "../domain/rutina";
+import {
+  actualizarCompartido,
+  diasDondeAparece,
+  ejerciciosVinculables,
+  quitarPierdeHistorial,
+  crearDia,
+  diaPierdeHistorial,
+  moverEjercicioOrden,
+} from "../domain/rutina";
 import { Marco } from "./Marco";
 import { Cabecera } from "./Cabecera";
 import { Boton } from "./Boton";
@@ -137,7 +145,42 @@ const CONFIRM_BTN = {
   cursor: "pointer",
 };
 
-function CabeceraCard({ ej, diaId, dias, onEditar, onQuitar }) {
+const ORDEN_BTN = {
+  background: "none",
+  border: "none",
+  color: C.gris,
+  fontFamily: "ui-monospace, monospace",
+  fontSize: 11,
+  width: 26,
+  height: 17,
+  cursor: "pointer",
+  lineHeight: 1,
+  padding: 0,
+};
+
+function OrdenBotones({ idx, total, onMover }) {
+  if (total < 2) return null;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", flexShrink: 0 }}>
+      <button
+        onClick={() => onMover(-1)}
+        disabled={idx === 0}
+        style={{ ...ORDEN_BTN, opacity: idx === 0 ? 0.25 : 1, cursor: idx === 0 ? "default" : "pointer" }}
+      >
+        ▲
+      </button>
+      <button
+        onClick={() => onMover(1)}
+        disabled={idx === total - 1}
+        style={{ ...ORDEN_BTN, opacity: idx === total - 1 ? 0.25 : 1, cursor: idx === total - 1 ? "default" : "pointer" }}
+      >
+        ▼
+      </button>
+    </div>
+  );
+}
+
+function CabeceraCard({ ej, diaId, dias, idx, total, onEditar, onQuitar, onMoverOrden }) {
   const [confirmando, setConfirmando] = useState(false);
   const e = (campo, valor) => onEditar(diaId, ej.id, campo, valor);
   const diaActual = dias.find((d) => d.id === diaId)?.nombre;
@@ -166,6 +209,7 @@ function CabeceraCard({ ej, diaId, dias, onEditar, onQuitar }) {
             CARDIO
           </span>
         )}
+        <OrdenBotones idx={idx} total={total} onMover={(dir) => onMoverOrden(diaId, ej.id, dir)} />
         <button onClick={intentarQuitar} style={QUITAR_BTN}>×</button>
       </div>
 
@@ -193,13 +237,13 @@ function CabeceraCard({ ej, diaId, dias, onEditar, onQuitar }) {
   );
 }
 
-function TarjetaCardio({ ej, diaId, dias, onEditar, onQuitar, onMover }) {
+function TarjetaCardio({ ej, diaId, dias, idx, total, onEditar, onQuitar, onMover, onMoverOrden }) {
   const [abierto, setAbierto] = useState(false);
   const e = (campo, valor) => onEditar(diaId, ej.id, campo, valor);
 
   return (
     <div style={{ background: C.sup, border: `1px solid ${C.linea}`, borderRadius: 6, marginBottom: 8, overflow: "hidden" }}>
-      <CabeceraCard ej={ej} diaId={diaId} dias={dias} onEditar={onEditar} onQuitar={onQuitar} />
+      <CabeceraCard ej={ej} diaId={diaId} dias={dias} idx={idx} total={total} onEditar={onEditar} onQuitar={onQuitar} onMoverOrden={onMoverOrden} />
 
       <div style={{ padding: "0 14px 12px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
         <div>
@@ -237,13 +281,13 @@ function TarjetaCardio({ ej, diaId, dias, onEditar, onQuitar, onMover }) {
   );
 }
 
-function TarjetaFuerza({ ej, diaId, dias, onEditar, onQuitar, onMover }) {
+function TarjetaFuerza({ ej, diaId, dias, idx, total, onEditar, onQuitar, onMover, onMoverOrden }) {
   const [abierto, setAbierto] = useState(false);
   const e = (campo, valor) => onEditar(diaId, ej.id, campo, valor);
 
   return (
     <div style={{ background: C.sup, border: `1px solid ${C.linea}`, borderRadius: 6, marginBottom: 8, overflow: "hidden" }}>
-      <CabeceraCard ej={ej} diaId={diaId} dias={dias} onEditar={onEditar} onQuitar={onQuitar} />
+      <CabeceraCard ej={ej} diaId={diaId} dias={dias} idx={idx} total={total} onEditar={onEditar} onQuitar={onQuitar} onMoverOrden={onMoverOrden} />
 
       {/* fila principal: series · reps · descanso */}
       <div style={{ padding: "0 14px 12px", display: "grid", gridTemplateColumns: "1fr 2fr 1fr", gap: 8 }}>
@@ -582,6 +626,7 @@ const CAMPOS_COMPARTIDOS = new Set(["nombre", "peso", "incremento", "repsObjetiv
 
 export function Ajustes({ dias, setDias, agregarEjercicioADia, traerHistorialDeHC, aplicarRutinaDeHC, volver }) {
   const [agregandoEnDia, setAgregandoEnDia] = useState(null);
+  const [confirmandoQuitarDia, setConfirmandoQuitarDia] = useState(null);
 
   const editar = (diaId, ejId, campo, valor) => {
     if (CAMPOS_COMPARTIDOS.has(campo)) {
@@ -606,6 +651,21 @@ export function Ajustes({ dias, setDias, agregarEjercicioADia, traerHistorialDeH
       if (d.id === diaDestinoId) return { ...d, ejercicios: [...d.ejercicios, ej] };
       return d;
     }));
+  };
+
+  const moverOrden = (diaId, ejId, direccion) =>
+    setDias(moverEjercicioOrden(dias, diaId, ejId, direccion));
+
+  const agregarDia = () => setDias([...dias, crearDia("Nuevo día")]);
+
+  const quitarDia = (diaId) => {
+    setConfirmandoQuitarDia(null);
+    setDias(dias.filter((d) => d.id !== diaId));
+  };
+
+  const intentarQuitarDia = (diaId) => {
+    if (diaPierdeHistorial(dias, diaId)) setConfirmandoQuitarDia(diaId);
+    else quitarDia(diaId);
   };
 
   if (agregandoEnDia) {
@@ -633,34 +693,59 @@ export function Ajustes({ dias, setDias, agregarEjercicioADia, traerHistorialDeH
         {dias.map((d) => (
           <div key={d.id} style={{ marginBottom: 32 }}>
             {/* nombre del día */}
-            <div style={{ marginBottom: 12, borderBottom: `1px solid ${C.linea}`, paddingBottom: 8 }}>
+            <div style={{ marginBottom: 12, borderBottom: `1px solid ${C.linea}`, paddingBottom: 8, display: "flex", gap: 10, alignItems: "center" }}>
               <input
                 value={d.nombre}
                 onChange={(e) => setDias(dias.map((x) => (x.id === d.id ? { ...x, nombre: e.target.value } : x)))}
                 style={{
+                  flex: 1,
                   background: "transparent",
                   color: C.hueso,
                   border: "none",
                   fontFamily: SANS,
                   fontSize: 20,
                   fontWeight: 700,
-                  width: "100%",
                   outline: "none",
                   padding: "4px 0",
                 }}
               />
+              {dias.length > 1 && (
+                <button onClick={() => intentarQuitarDia(d.id)} style={QUITAR_BTN}>×</button>
+              )}
             </div>
 
+            {confirmandoQuitarDia === d.id && (
+              <div style={{ padding: "12px 14px", background: "#2a1a1a", border: `1px solid #3a2a2a`, borderRadius: 6, marginBottom: 12 }}>
+                <div style={{ fontFamily: SANS, fontSize: 13, color: C.hueso, lineHeight: 1.45 }}>
+                  Este día tiene historial que no existe en ningún otro día. Si lo borrás, se pierde.
+                </div>
+                <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                  <button onClick={() => setConfirmandoQuitarDia(null)} style={CONFIRM_BTN}>
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={() => quitarDia(d.id)}
+                    style={{ ...CONFIRM_BTN, color: "#c0392b", borderColor: "#3a2a2a" }}
+                  >
+                    Borrar igual
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* ejercicios */}
-            {d.ejercicios.map((e) => (
+            {d.ejercicios.map((e, idx) => (
               <TarjetaEjercicio
                 key={e.id}
                 ej={e}
                 diaId={d.id}
                 dias={dias}
+                idx={idx}
+                total={d.ejercicios.length}
                 onEditar={editar}
                 onQuitar={quitarEjercicio}
                 onMover={moverEjercicio}
+                onMoverOrden={moverOrden}
               />
             ))}
 
@@ -672,6 +757,13 @@ export function Ajustes({ dias, setDias, agregarEjercicioADia, traerHistorialDeH
             </button>
           </div>
         ))}
+
+        <button
+          onClick={agregarDia}
+          style={{ width: "100%", background: "none", border: `1px dashed ${C.sodio}`, borderRadius: 6, color: C.sodio, fontFamily: SANS, fontSize: 15, fontWeight: 600, padding: "15px 0", cursor: "pointer", marginBottom: 8 }}
+        >
+          + Agregar día
+        </button>
 
         <SyncPanel
           dias={dias}

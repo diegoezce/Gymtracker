@@ -55,6 +55,35 @@ export function quitarPierdeHistorial(dias, id) {
   return diasDondeAparece(dias, id).length === 1;
 }
 
+// ── días ────────────────────────────────────────────────────────
+
+export function crearDia(nombre) {
+  return { id: genId(nombre), nombre, ejercicios: [] };
+}
+
+// true si borrar este día se lleva puesto historial que no sobrevive en
+// ningún otro día — mismo criterio que quitarPierdeHistorial, por
+// ejercicio del día.
+export function diaPierdeHistorial(dias, diaId) {
+  const dia = dias.find((d) => d.id === diaId);
+  if (!dia) return false;
+  return dia.ejercicios.some((e) => quitarPierdeHistorial(dias, e.id));
+}
+
+// Sube (-1) o baja (1) un ejercicio un lugar dentro de su día. No-op en
+// los extremos; no afecta otros días.
+export function moverEjercicioOrden(dias, diaId, ejId, direccion) {
+  return dias.map((d) => {
+    if (d.id !== diaId) return d;
+    const idx = d.ejercicios.findIndex((e) => e.id === ejId);
+    const destino = idx + direccion;
+    if (idx === -1 || destino < 0 || destino >= d.ejercicios.length) return d;
+    const ejercicios = [...d.ejercicios];
+    [ejercicios[idx], ejercicios[destino]] = [ejercicios[destino], ejercicios[idx]];
+    return { ...d, ejercicios };
+  });
+}
+
 // Aplica `cambios` (subset de campos compartidos) a todo ejercicio, en
 // cualquier día, cuyo id coincida.
 export function actualizarCompartido(dias, id, cambios) {

@@ -8,6 +8,9 @@ import {
   resincronizarCompartidos,
   diasDondeAparece,
   quitarPierdeHistorial,
+  crearDia,
+  diaPierdeHistorial,
+  moverEjercicioOrden,
 } from "./rutina";
 
 function dosDias() {
@@ -177,5 +180,85 @@ describe("resincronizarCompartidos", () => {
     }));
     const resultado = resincronizarCompartidos(compartido);
     expect(resultado[0].ejercicios[0].historial.length).toBe(1);
+  });
+});
+
+describe("crearDia", () => {
+  it("crea un día vacío con id único", () => {
+    const d1 = crearDia("Nuevo día");
+    const d2 = crearDia("Nuevo día");
+    expect(d1.nombre).toBe("Nuevo día");
+    expect(d1.ejercicios).toEqual([]);
+    expect(d1.id).not.toBe(d2.id);
+  });
+});
+
+describe("diaPierdeHistorial", () => {
+  const conHistorial = (ej) => ({
+    ...ej,
+    historial: [{ fecha: "2026-07-01", series: [{ peso: 60, reps: 8, rir: 1 }] }],
+  });
+
+  it("es false para un día vacío", () => {
+    const dias = [crearDia("Día X")];
+    expect(diaPierdeHistorial(dias, dias[0].id)).toBe(false);
+  });
+
+  it("es false si el único ejercicio con historial está compartido con otro día", () => {
+    const { banca } = dosDias();
+    const conHist = conHistorial(banca);
+    const dias = [
+      { id: "a", nombre: "Día A", ejercicios: [conHist] },
+      { id: "b", nombre: "Día B", ejercicios: [conHist] },
+    ];
+    expect(diaPierdeHistorial(dias, "a")).toBe(false);
+  });
+
+  it("es true si tiene un ejercicio con historial exclusivo de ese día", () => {
+    const { banca } = dosDias();
+    const dias = [
+      { id: "a", nombre: "Día A", ejercicios: [conHistorial(banca)] },
+      { id: "b", nombre: "Día B", ejercicios: [] },
+    ];
+    expect(diaPierdeHistorial(dias, "a")).toBe(true);
+  });
+});
+
+describe("moverEjercicioOrden", () => {
+  function tresEjercicios() {
+    const e1 = ejercicio("Uno", 10);
+    const e2 = ejercicio("Dos", 20);
+    const e3 = ejercicio("Tres", 30);
+    return { dias: [{ id: "a", nombre: "Día A", ejercicios: [e1, e2, e3] }], e1, e2, e3 };
+  }
+
+  it("sube: intercambia con el vecino anterior", () => {
+    const { dias, e1, e2, e3 } = tresEjercicios();
+    const resultado = moverEjercicioOrden(dias, "a", e2.id, -1);
+    expect(resultado[0].ejercicios.map((e) => e.id)).toEqual([e2.id, e1.id, e3.id]);
+  });
+
+  it("baja: intercambia con el vecino siguiente", () => {
+    const { dias, e1, e2, e3 } = tresEjercicios();
+    const resultado = moverEjercicioOrden(dias, "a", e2.id, 1);
+    expect(resultado[0].ejercicios.map((e) => e.id)).toEqual([e1.id, e3.id, e2.id]);
+  });
+
+  it("no-op si ya está en el extremo", () => {
+    const { dias, e1, e3 } = tresEjercicios();
+    expect(moverEjercicioOrden(dias, "a", e1.id, -1)[0].ejercicios.map((e) => e.id)).toEqual(
+      dias[0].ejercicios.map((e) => e.id)
+    );
+    expect(moverEjercicioOrden(dias, "a", e3.id, 1)[0].ejercicios.map((e) => e.id)).toEqual(
+      dias[0].ejercicios.map((e) => e.id)
+    );
+  });
+
+  it("no afecta otros días", () => {
+    const { dias, e2 } = tresEjercicios();
+    const otro = ejercicio("Otro", 40);
+    const conOtroDia = [...dias, { id: "b", nombre: "Día B", ejercicios: [otro] }];
+    const resultado = moverEjercicioOrden(conOtroDia, "a", e2.id, -1);
+    expect(resultado[1].ejercicios).toEqual(conOtroDia[1].ejercicios);
   });
 });

@@ -134,6 +134,15 @@ const QUITAR_BTN = {
   lineHeight: 1,
 };
 
+// Botón de borrar día: área táctil más grande que QUITAR_BTN — vive solo
+// en el header del día, junto al chevron, sin otros controles cerca.
+const QUITAR_DIA_BTN = {
+  ...QUITAR_BTN,
+  fontSize: 20,
+  width: 44,
+  height: 44,
+};
+
 const CONFIRM_BTN = {
   background: "none",
   border: `1px solid ${C.linea}`,
@@ -672,10 +681,10 @@ export function Ajustes({ dias, setDias, agregarEjercicioADia, traerHistorialDeH
     setDias(dias.filter((d) => d.id !== diaId));
   };
 
-  const intentarQuitarDia = (diaId) => {
-    if (diaPierdeHistorial(dias, diaId)) setConfirmandoQuitarDia(diaId);
-    else quitarDia(diaId);
-  };
+  // Siempre confirma — un día vacío/sin historial propio también se puede
+  // borrar sin querer con un tap de más. diaPierdeHistorial sólo decide
+  // qué tan fuerte es el aviso.
+  const intentarQuitarDia = (diaId) => setConfirmandoQuitarDia(diaId);
 
   if (agregandoEnDia) {
     return (
@@ -704,10 +713,10 @@ export function Ajustes({ dias, setDias, agregarEjercicioADia, traerHistorialDeH
           return (
           <div key={d.id} style={{ marginBottom: 32 }}>
             {/* nombre del día */}
-            <div style={{ marginBottom: 12, borderBottom: `1px solid ${C.linea}`, paddingBottom: 8, display: "flex", gap: 4, alignItems: "center" }}>
+            <div style={{ marginBottom: 12, borderBottom: `1px solid ${C.linea}`, paddingBottom: 4, display: "flex", gap: 8, alignItems: "center" }}>
               <button
                 onClick={() => toggleColapsado(d.id)}
-                style={{ background: "none", border: "none", color: C.gris, fontFamily: "ui-monospace, monospace", fontSize: 13, width: 26, height: 26, flexShrink: 0, cursor: "pointer" }}
+                style={{ background: "none", border: "none", color: C.gris, fontFamily: "ui-monospace, monospace", fontSize: 14, width: 44, height: 44, flexShrink: 0, cursor: "pointer" }}
               >
                 {colapsado ? "▶" : "▼"}
               </button>
@@ -733,14 +742,16 @@ export function Ajustes({ dias, setDias, agregarEjercicioADia, traerHistorialDeH
                 </span>
               )}
               {dias.length > 1 && (
-                <button onClick={() => intentarQuitarDia(d.id)} style={QUITAR_BTN}>×</button>
+                <button onClick={() => intentarQuitarDia(d.id)} style={QUITAR_DIA_BTN}>×</button>
               )}
             </div>
 
             {confirmandoQuitarDia === d.id && (
               <div style={{ padding: "12px 14px", background: "#2a1a1a", border: `1px solid #3a2a2a`, borderRadius: 6, marginBottom: 12 }}>
                 <div style={{ fontFamily: SANS, fontSize: 13, color: C.hueso, lineHeight: 1.45 }}>
-                  Este día tiene historial que no existe en ningún otro día. Si lo borrás, se pierde.
+                  {diaPierdeHistorial(dias, d.id)
+                    ? "Este día tiene historial que no existe en ningún otro día. Si lo borrás, se pierde."
+                    : `¿Borrar "${d.nombre}" y ${d.ejercicios.length ? `sus ${d.ejercicios.length} ejercicio${d.ejercicios.length !== 1 ? "s" : ""}` : "el día"}?`}
                 </div>
                 <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
                   <button onClick={() => setConfirmandoQuitarDia(null)} style={CONFIRM_BTN}>

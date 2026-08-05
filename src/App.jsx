@@ -86,8 +86,10 @@ export default function App() {
   // ejIdx null → menú del día; number → ejercicio en curso
   // saltados vive sólo acá: saltear es "hoy no lo hago", no toca la rutina
 
-  const comenzar = (dia) =>
+  const comenzar = (dia) => {
+    setAviso("");
     setSesion({ diaId: dia.id, ejIdx: null, pesoActual: 0, series: [], hechos: {}, progreso: {}, saltados: {} });
+  };
 
   const dia = sesion ? dias.find((d) => d.id === sesion.diaId) : null;
   const ej = dia && sesion.ejIdx !== null ? dia.ejercicios[sesion.ejIdx] : null;

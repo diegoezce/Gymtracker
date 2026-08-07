@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { storage, CLAVE_RUTINA } from "./storage";
 import { RUTINA_INICIAL, actualizarCompartido, vincularEjercicio, resincronizarCompartidos } from "./domain/rutina";
-import { leerToken, leerAutoSync, fetchSesiones, aplicarSesiones, pushSesiones, construirSesiones, fetchRutina, aplicarRutina } from "./sync/hcAdapter";
+import { leerToken, leerAutoSync, fetchSesiones, aplicarSesiones, pushSesiones, construirSesiones, fetchRutina, aplicarRutina, SYNC_KEY, TOKEN_KEY } from "./sync/hcAdapter";
 import { progresar, aprender } from "./domain/progression";
 import { hoy } from "./utils/format";
 import { Marco } from "./components/Marco";
@@ -10,6 +10,7 @@ import { DiaMenu } from "./components/DiaMenu";
 import { Sesion } from "./components/Sesion";
 import { Ajustes } from "./components/Ajustes";
 import { Progreso } from "./components/Progreso";
+import { ConfirmarSync } from "./components/ConfirmarSync";
 import { C, MONO } from "./theme";
 
 export default function App() {
@@ -18,6 +19,7 @@ export default function App() {
   const [pantalla, setPantalla] = useState("inicio");
   const [sesion, setSesion] = useState(null);
   const [aviso, setAviso] = useState("");
+  const [preguntaSync, setPreguntaSync] = useState(null);
   const primeraCarga = useRef(true);
 
   useEffect(() => {
@@ -173,7 +175,10 @@ export default function App() {
     setSesion({ ...sesion, ejIdx: null, series: [], progreso: nuevoProg });
   };
 
-  // Sale de la sesión: vuelca todo el progreso parcial al historial
+  // Sale de la sesión: vuelca todo el progreso parcial al historial. Si
+  // hubo actividad y el auto-sync está apagado, primero pregunta si
+  // sincronizar a mano — para no depender de acordarse del botón manual
+  // en Ajustes (ver ConfirmarSync).
   const salirSesion = () => {
     const progreso = { ...sesion.progreso };
     if (ej && ej.tipo !== "cardio" && sesion.series.length > 0) {
@@ -183,8 +188,8 @@ export default function App() {
     const entradas = Object.entries(progreso).filter(
       ([id, p]) => p.series?.length > 0 && !sesion.saltados?.[id]
     );
+    let nuevos = dias;
     if (entradas.length > 0) {
-      let nuevos = dias;
       entradas.forEach(([id, p]) => {
         const actual = dia.ejercicios.find((e) => e.id === id);
         if (!actual) return;
@@ -193,8 +198,36 @@ export default function App() {
         });
       });
       setDias(nuevos);
-      syncSilencioso(nuevos);
     }
+
+    // ejercicios cerrados del todo durante la sesión (no sólo el parcial de arriba)
+    const huboActividad = Object.keys(sesion.hechos).length > 0 || entradas.length > 0;
+    const token = leerToken();
+    if (huboActividad && token && !leerAutoSync()) {
+      setPreguntaSync(nuevos);
+      return;
+    }
+    if (huboActividad) syncSilencioso(nuevos);
+    setSesion(null);
+    setPantalla("inicio");
+  };
+
+  const confirmarSyncYSalir = async () => {
+    try {
+      const token = leerToken();
+      await pushSesiones(token, construirSesiones(preguntaSync));
+      localStorage.setItem(SYNC_KEY, new Date().toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }));
+      setPreguntaSync(null);
+      setSesion(null);
+      setPantalla("inicio");
+    } catch (e) {
+      if (e.message === "401") localStorage.removeItem(TOKEN_KEY);
+      throw e; // ConfirmarSync lo muestra y deja reintentar o salir sin sincronizar
+    }
+  };
+
+  const salirSinSincronizar = () => {
+    setPreguntaSync(null);
     setSesion(null);
     setPantalla("inicio");
   };
@@ -229,6 +262,10 @@ export default function App() {
     else saltados[ejId] = true;
     setSesion({ ...sesion, saltados });
   };
+
+  if (preguntaSync) {
+    return <ConfirmarSync onSincronizar={confirmarSyncYSalir} onSalirSinSincronizar={salirSinSincronizar} />;
+  }
 
   if (sesion && !ej) {
     return (

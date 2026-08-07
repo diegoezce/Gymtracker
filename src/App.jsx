@@ -310,6 +310,7 @@ export default function App() {
         agregarEjercicioADia={agregarEjercicioADia}
         traerHistorialDeHC={traerHistorialDeHC}
         aplicarRutinaDeHC={aplicarRutinaDeHC}
+        onImportarRutina={(nuevos) => setDias(resincronizarCompartidos(nuevos))}
         volver={() => setPantalla("inicio")}
       />
     );

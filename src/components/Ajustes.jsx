@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { C, MONO, SANS } from "../theme";
+import { exportarRutina, importarRutina, resumenDias } from "../domain/compartir";
 import {
   actualizarCompartido,
   diasDondeAparece,
@@ -439,6 +440,128 @@ function TarjetaEjercicio(props) {
   return <TarjetaFuerza {...props} />;
 }
 
+/* ── panel compartir rutina ── */
+
+function PanelCompartir({ dias, onImportar }) {
+  const [modo, setModo] = useState(null); // null | "importar"
+  const [texto, setTexto] = useState("");
+  const [preview, setPreview] = useState(null); // dias parseados esperando confirmación
+  const [error, setError] = useState("");
+  const [copiado, setCopiado] = useState(false);
+  const textareaRef = useRef(null);
+
+  async function exportar() {
+    const json = exportarRutina(dias);
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "Mi rutina de gym", text: json });
+        return;
+      } catch {
+        // si cancela o falla, copiamos al clipboard
+      }
+    }
+    await navigator.clipboard.writeText(json);
+    setCopiado(true);
+    setTimeout(() => setCopiado(false), 2000);
+  }
+
+  function parsear() {
+    setError("");
+    try {
+      const nuevos = importarRutina(texto, dias);
+      setPreview(nuevos);
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  function confirmarImport() {
+    onImportar(preview);
+    setPreview(null);
+    setTexto("");
+    setModo(null);
+  }
+
+  return (
+    <div style={{ marginTop: 36, paddingTop: 24, borderTop: `1px solid ${C.linea}` }}>
+      <div style={{ fontFamily: SANS, fontSize: 16, fontWeight: 700, color: C.hueso, marginBottom: 16 }}>
+        Compartir rutina
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <Boton tono="fuerte" alto={54} onClick={exportar}>
+          {copiado ? "Copiado al portapapeles" : "Exportar mi rutina"}
+        </Boton>
+
+        <Boton
+          tono="fantasma"
+          alto={46}
+          onClick={() => { setModo(modo === "importar" ? null : "importar"); setError(""); setPreview(null); setTexto(""); }}
+        >
+          {modo === "importar" ? "Cancelar importación" : "Importar rutina"}
+        </Boton>
+
+        {modo === "importar" && !preview && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ fontFamily: SANS, fontSize: 12, color: C.gris, lineHeight: 1.5 }}>
+              Pegá el JSON que te compartieron y tocá "Previsualizar".
+            </div>
+            <textarea
+              ref={textareaRef}
+              value={texto}
+              onChange={(e) => setTexto(e.target.value)}
+              rows={6}
+              placeholder='{"v":1,"dias":[...]}'
+              style={{
+                width: "100%",
+                background: C.sup2,
+                color: C.hueso,
+                border: `1px solid ${C.linea}`,
+                borderRadius: 4,
+                padding: "10px 12px",
+                fontFamily: MONO,
+                fontSize: 12,
+                boxSizing: "border-box",
+                resize: "vertical",
+                outline: "none",
+              }}
+            />
+            <Boton tono="neutro" alto={46} onClick={parsear}>
+              Previsualizar
+            </Boton>
+            {error && (
+              <div style={{ fontFamily: SANS, fontSize: 13, color: C.oxido }}>{error}</div>
+            )}
+          </div>
+        )}
+
+        {preview && (
+          <div style={{ background: C.sup, border: `1px solid ${C.sodio}`, borderRadius: 6, padding: "12px 14px" }}>
+            <div style={{ fontFamily: SANS, fontSize: 13, color: C.hueso, lineHeight: 1.5 }}>
+              Tu rutina local ({resumenDias(dias)}) se reemplaza por la importada ({resumenDias(preview)}).
+              El historial de los ejercicios que coincidan se conserva.
+            </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+              <button
+                onClick={() => { setPreview(null); setModo(null); }}
+                style={{ background: "none", border: `1px solid ${C.linea}`, borderRadius: 4, color: C.gris, fontFamily: SANS, fontSize: 13, padding: "7px 14px", cursor: "pointer" }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmarImport}
+                style={{ background: "none", border: `1px solid ${C.sodio}`, borderRadius: 4, color: C.sodio, fontFamily: SANS, fontSize: 13, padding: "7px 14px", cursor: "pointer" }}
+              >
+                Importar igual
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ── panel de sync ── */
 
 const contarRutina = (ds) => ({
@@ -702,7 +825,7 @@ function SyncPanel({ dias, traerHistorialDeHC, aplicarRutinaDeHC }) {
 // ver actualizarCompartido en domain/rutina.js.
 const CAMPOS_COMPARTIDOS = new Set(["nombre", "peso", "incremento", "repsObjetivo", "duracionObjetivo"]);
 
-export function Ajustes({ dias, setDias, agregarEjercicioADia, traerHistorialDeHC, aplicarRutinaDeHC, volver }) {
+export function Ajustes({ dias, setDias, agregarEjercicioADia, traerHistorialDeHC, aplicarRutinaDeHC, onImportarRutina, volver }) {
   const [agregandoEnDia, setAgregandoEnDia] = useState(null);
   const [confirmandoQuitarDia, setConfirmandoQuitarDia] = useState(null);
   // Colapsado por default (la lista de días se hace larga); un día recién
@@ -872,6 +995,8 @@ export function Ajustes({ dias, setDias, agregarEjercicioADia, traerHistorialDeH
         >
           + Agregar día
         </button>
+
+        <PanelCompartir dias={dias} onImportar={onImportarRutina} />
 
         <SyncPanel
           dias={dias}

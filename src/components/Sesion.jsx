@@ -169,6 +169,9 @@ export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarSerieT
 
   const hayMasSeries = sesion.series.length > 0 && sesion.series.length < ej.series;
   const esTiempo = ej.tipo === "tiempo";
+  const ultimaSerie = !esTiempo
+    ? ej.historial[ej.historial.length - 1]?.series.slice(-1)[0]
+    : null;
 
   // Re-schedule SW notification when mounting with a restored timer
   useEffect(() => {
@@ -249,6 +252,14 @@ export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarSerieT
               : `${ej.repsMax ? `${ej.repsObjetivo}–${ej.repsMax}` : ej.repsObjetivo} reps`}
             {ej.descanso ? ` · ${ej.descanso}s descanso` : ""}
           </Etiqueta>
+
+          {!esTiempo && (
+            <div style={{ marginTop: 6, fontFamily: MONO, fontSize: 12, color: C.gris, opacity: 0.75 }}>
+              {ultimaSerie
+                ? `Última vez: ${fmt(ultimaSerie.peso)} kg × ${ultimaSerie.reps} reps${ultimaSerie.rir === 0 ? " · al fallo" : ""}`
+                : "No hay registro previo."}
+            </div>
+          )}
 
           {!esTiempo && (
             <div style={{ margin: "28px 0 8px", border: `1px solid ${C.linea}`, borderRadius: 4, overflow: "hidden", background: C.sup }}>

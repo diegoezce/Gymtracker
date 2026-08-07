@@ -48,7 +48,7 @@ export const ejercicioTiempo = (nombre, duracionObjetivo = 30, series = 3, desca
 // mantienen sincronizados entre copias. Series/reps/descanso (o
 // duración/distancia en cardio) quedan libres para variar por día.
 
-const CAMPOS_COMPARTIDOS = ["id", "tipo", "nombre", "peso", "incremento", "repsObjetivo", "duracionObjetivo", "ajustes", "historial"];
+const CAMPOS_COMPARTIDOS = ["id", "tipo", "nombre", "peso", "incremento", "repsObjetivo", "duracionObjetivo", "ajustes", "historial", "tecnica", "imagenUrl"];
 
 function camposCompartidos(ej) {
   const out = {};

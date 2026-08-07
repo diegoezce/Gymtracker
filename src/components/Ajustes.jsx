@@ -119,6 +119,60 @@ function Toggle({ activo, onChange }) {
   );
 }
 
+/* ── campos técnica (compartido por todas las tarjetas) ── */
+
+function CamposTecnica({ ej, onEditar }) {
+  return (
+    <>
+      <div>
+        <Label>Notas de técnica</Label>
+        <textarea
+          value={ej.tecnica ?? ""}
+          onChange={(ev) => onEditar("tecnica", ev.target.value)}
+          placeholder="Describe la ejecución, puntos clave, errores comunes…"
+          rows={3}
+          style={{
+            width: "100%",
+            background: C.sup2,
+            color: C.hueso,
+            border: `1px solid ${C.linea}`,
+            borderRadius: 4,
+            padding: "10px 12px",
+            fontFamily: SANS,
+            fontSize: 14,
+            lineHeight: 1.5,
+            boxSizing: "border-box",
+            resize: "vertical",
+            outline: "none",
+          }}
+        />
+      </div>
+      <div>
+        <Label>URL de imagen (opcional)</Label>
+        <input
+          type="url"
+          value={ej.imagenUrl ?? ""}
+          onChange={(ev) => onEditar("imagenUrl", ev.target.value)}
+          placeholder="https://..."
+          autoCapitalize="none"
+          style={{
+            width: "100%",
+            background: C.sup2,
+            color: C.hueso,
+            border: `1px solid ${C.linea}`,
+            borderRadius: 4,
+            padding: "10px 12px",
+            fontFamily: SANS,
+            fontSize: 14,
+            boxSizing: "border-box",
+            outline: "none",
+          }}
+        />
+      </div>
+    </>
+  );
+}
+
 /* ── tarjeta de ejercicio ── */
 
 const QUITAR_BTN = {
@@ -271,17 +325,18 @@ function TarjetaCardio({ ej, diaId, dias, idx, total, onEditar, onQuitar, onMove
         </div>
       </div>
 
-      {dias.length > 1 && (
-        <>
-          <button
-            onClick={() => setAbierto((a) => !a)}
-            style={{ width: "100%", background: "none", border: "none", borderTop: `1px solid ${C.linea}`, color: C.gris, fontFamily: SANS, fontSize: 12, padding: "8px 14px", cursor: "pointer", textAlign: "left", display: "flex", justifyContent: "space-between" }}
-          >
-            <span>Mover a otro día</span>
-            <span>{abierto ? "▲" : "▼"}</span>
-          </button>
-          {abierto && (
-            <div style={{ padding: "10px 14px 14px", borderTop: `1px solid ${C.linea}`, display: "flex", gap: 6, flexWrap: "wrap" }}>
+      <button
+        onClick={() => setAbierto((a) => !a)}
+        style={{ width: "100%", background: "none", border: "none", borderTop: `1px solid ${C.linea}`, color: C.gris, fontFamily: SANS, fontSize: 12, padding: "8px 14px", cursor: "pointer", textAlign: "left", display: "flex", justifyContent: "space-between" }}
+      >
+        <span>Técnica{dias.length > 1 ? " · mover" : ""}</span>
+        <span>{abierto ? "▲" : "▼"}</span>
+      </button>
+      {abierto && (
+        <div style={{ padding: "10px 14px 14px", borderTop: `1px solid ${C.linea}`, display: "flex", flexDirection: "column", gap: 10 }}>
+          <CamposTecnica ej={ej} onEditar={e} />
+          {dias.length > 1 && (
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
               {dias.filter((d) => d.id !== diaId).map((d) => (
                 <button key={d.id} onClick={() => onMover(diaId, ej.id, d.id)}
                   style={{ background: "none", border: `1px solid ${C.linea}`, borderRadius: 4, color: C.gris, fontFamily: SANS, fontSize: 13, padding: "6px 12px", cursor: "pointer" }}>
@@ -290,7 +345,7 @@ function TarjetaCardio({ ej, diaId, dias, idx, total, onEditar, onQuitar, onMove
               ))}
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   );
@@ -335,6 +390,8 @@ function TarjetaTiempo({ ej, diaId, dias, idx, total, onEditar, onQuitar, onMove
             <Label>Incremento (s)</Label>
             <NumInput value={ej.incremento} onChange={(v) => e("incremento", v)} step={5} min={5} />
           </div>
+
+          <CamposTecnica ej={ej} onEditar={e} />
 
           {dias.length > 1 && (
             <div>
@@ -409,6 +466,8 @@ function TarjetaFuerza({ ej, diaId, dias, idx, total, onEditar, onQuitar, onMove
               <NumInput value={ej.incremento} onChange={(v) => e("incremento", v)} step={0.5} min={0.5} />
             </div>
           </div>
+
+          <CamposTecnica ej={ej} onEditar={e} />
 
           {dias.length > 1 && (
             <div>
@@ -823,7 +882,7 @@ function SyncPanel({ dias, traerHistorialDeHC, aplicarRutinaDeHC }) {
 
 // Campos compartidos entre copias del mismo ejercicio en distintos días —
 // ver actualizarCompartido en domain/rutina.js.
-const CAMPOS_COMPARTIDOS = new Set(["nombre", "peso", "incremento", "repsObjetivo", "duracionObjetivo"]);
+const CAMPOS_COMPARTIDOS = new Set(["nombre", "peso", "incremento", "repsObjetivo", "duracionObjetivo", "tecnica", "imagenUrl"]);
 
 export function Ajustes({ dias, setDias, agregarEjercicioADia, traerHistorialDeHC, aplicarRutinaDeHC, onImportarRutina, volver }) {
   const [agregandoEnDia, setAgregandoEnDia] = useState(null);

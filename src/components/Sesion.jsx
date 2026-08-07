@@ -8,6 +8,7 @@ import { Etiqueta } from "./Etiqueta";
 import { Repeticiones } from "./Repeticiones";
 import { TiempoInput } from "./TiempoInput";
 import { Boton } from "./Boton";
+import { ModalTecnica } from "./ModalTecnica";
 
 const R = 54;
 const CIRC = 2 * Math.PI * R;
@@ -227,6 +228,8 @@ export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarSerieT
   };
 
   const [editandoIdx, setEditandoIdx] = useState(null);
+  const [modalTecnica, setModalTecnica] = useState(false);
+  const tieneTecnica = ej.tecnica?.trim() || ej.imagenUrl?.trim();
 
   const editarSerie = (i, campo, valor) => {
     const nuevas = sesion.series.map((s, idx) =>
@@ -238,13 +241,38 @@ export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarSerieT
   return (
     <Marco>
       <Cabecera izq={`${dia.nombre} · ${sesion.ejIdx + 1}/${dia.ejercicios.length}`} onSalir={salir} />
+      {modalTecnica && <ModalTecnica ej={ej} onCerrar={() => setModalTecnica(false)} />}
       {ej.tipo === "cardio" ? (
         <SesionCardio ej={ej} guardarCardio={guardarCardio} salir={salir} />
       ) : (
         <div style={{ padding: "8px 20px 32px" }}>
-          <h1 style={{ fontFamily: SANS, fontSize: 30, fontWeight: 700, lineHeight: 1.1, color: C.hueso, margin: "16px 0 4px" }}>
-            {ej.nombre}
-          </h1>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 10, margin: "16px 0 4px" }}>
+            <h1 style={{ fontFamily: SANS, fontSize: 30, fontWeight: 700, lineHeight: 1.1, color: C.hueso, margin: 0, flex: 1 }}>
+              {ej.nombre}
+            </h1>
+            {tieneTecnica && (
+              <button
+                onClick={() => setModalTecnica(true)}
+                style={{
+                  flexShrink: 0,
+                  marginTop: 4,
+                  width: 28,
+                  height: 28,
+                  borderRadius: "50%",
+                  border: `1px solid ${C.gris}`,
+                  background: "none",
+                  color: C.gris,
+                  fontFamily: SANS,
+                  fontSize: 14,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  lineHeight: 1,
+                }}
+              >
+                ?
+              </button>
+            )}
+          </div>
           <Etiqueta>
             Serie {sesion.series.length + 1} de {ej.series} · objetivo{" "}
             {esTiempo

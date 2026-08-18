@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { C, MONO, SANS } from "../theme";
 import { barra } from "../styles/helpers";
-import { fmt } from "../utils/format";
+import { fmt, hoy } from "../utils/format";
 import { Marco } from "./Marco";
 import { Cabecera } from "./Cabecera";
 import { Etiqueta } from "./Etiqueta";
@@ -99,7 +99,7 @@ function NumStep({ value, onChange, step = 1, min = 0 }) {
 }
 
 function SesionCardio({ ej, guardarCardio, salir }) {
-  const ultima = ej.historial[ej.historial.length - 1];
+  const ultima = [...ej.historial].reverse().find((h) => h.fecha !== hoy());
   const [duracion, setDuracion] = useState(ultima?.duracion ?? ej.duracionMin);
   const [distancia, setDistancia] = useState(ultima?.distancia ?? ej.distanciaKm ?? 0);
   const trackDist = ej.distanciaKm !== null;
@@ -170,8 +170,9 @@ export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarSerieT
 
   const hayMasSeries = sesion.series.length > 0 && sesion.series.length < ej.series;
   const esTiempo = ej.tipo === "tiempo";
+  const historialPrevio = ej.historial.filter((h) => h.fecha !== hoy());
   const ultimaSerie = !esTiempo
-    ? ej.historial[ej.historial.length - 1]?.series.slice(-1)[0]
+    ? historialPrevio[historialPrevio.length - 1]?.series.slice(-1)[0]
     : null;
 
   // Re-schedule SW notification when mounting with a restored timer

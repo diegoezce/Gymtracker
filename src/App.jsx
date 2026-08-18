@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { storage, CLAVE_RUTINA } from "./storage";
-import { RUTINA_INICIAL, actualizarCompartido, vincularEjercicio, resincronizarCompartidos } from "./domain/rutina";
+import { RUTINA_INICIAL, actualizarCompartido, vincularEjercicio, resincronizarCompartidos, agregarEntradaHistorial, editarEntradaHistorial, eliminarEntradaHistorial } from "./domain/rutina";
 import { leerToken, leerAutoSync, fetchSesiones, aplicarSesiones, pushSesiones, construirSesiones, fetchRutina, aplicarRutina, SYNC_KEY, TOKEN_KEY } from "./sync/hcAdapter";
 import { progresar, aprender } from "./domain/progression";
 import { hoy } from "./utils/format";
@@ -109,7 +109,7 @@ export default function App() {
 
   const guardarCardio = (duracion, distancia) => {
     const nuevos = actualizarCompartido(dias, ej.id, {
-      historial: [...ej.historial, { fecha: hoy(), duracion, distancia }].slice(-40),
+      historial: agregarEntradaHistorial(ej.historial, { fecha: hoy(), duracion, distancia }),
     });
     setDias(nuevos);
     syncSilencioso(nuevos);
@@ -133,7 +133,7 @@ export default function App() {
       repsObjetivo,
       incremento,
       ajustes,
-      historial: [...ej.historial, { fecha: hoy(), series }].slice(-40),
+      historial: agregarEntradaHistorial(ej.historial, { fecha: hoy(), series }),
     });
     setDias(nuevos);
     setAviso(av || nota);
@@ -154,7 +154,7 @@ export default function App() {
     const { duracionObjetivo, nota } = progresar(ej, series);
     const nuevos = actualizarCompartido(dias, ej.id, {
       duracionObjetivo,
-      historial: [...ej.historial, { fecha: hoy(), series }].slice(-40),
+      historial: agregarEntradaHistorial(ej.historial, { fecha: hoy(), series }),
     });
     setDias(nuevos);
     setAviso(nota);
@@ -194,7 +194,7 @@ export default function App() {
         const actual = dia.ejercicios.find((e) => e.id === id);
         if (!actual) return;
         nuevos = actualizarCompartido(nuevos, id, {
-          historial: [...actual.historial, { fecha: hoy(), series: p.series }].slice(-40),
+          historial: agregarEntradaHistorial(actual.historial, { fecha: hoy(), series: p.series }),
         });
       });
       setDias(nuevos);
@@ -246,6 +246,19 @@ export default function App() {
   // Ajustes, que necesita los datos para mostrar la confirmación.
   const aplicarRutinaDeHC = (rutina) => {
     setDias((prev) => resincronizarCompartidos(aplicarRutina(rutina, prev)));
+  };
+
+  // Corrección manual de un registro viejo (o de hoy) desde Progreso.
+  const editarHistorial = (ejId, fechaOriginal, cambios) => {
+    const nuevos = editarEntradaHistorial(dias, ejId, fechaOriginal, cambios);
+    setDias(nuevos);
+    syncSilencioso(nuevos);
+  };
+
+  const eliminarHistorial = (ejId, fecha) => {
+    const nuevos = eliminarEntradaHistorial(dias, ejId, fecha);
+    setDias(nuevos);
+    syncSilencioso(nuevos);
   };
 
   // Agrega ejFuente (existente en otro día, o recién creado) a diaId,
@@ -316,7 +329,14 @@ export default function App() {
     );
 
   if (pantalla === "historial")
-    return <Progreso dias={dias} volver={() => setPantalla("inicio")} />;
+    return (
+      <Progreso
+        dias={dias}
+        volver={() => setPantalla("inicio")}
+        onEditarHistorial={editarHistorial}
+        onEliminarHistorial={eliminarHistorial}
+      />
+    );
 
   return (
     <Inicio

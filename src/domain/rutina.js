@@ -108,6 +108,44 @@ export function actualizarCompartido(dias, id, cambios) {
   }));
 }
 
+// ── edición de historial ───────────────────────────────────────
+
+// Reemplaza la entrada con la misma fecha si ya existe (evita duplicados
+// cuando el mismo ejercicio se cierra dos veces el mismo día, p.ej. por
+// estar vinculado a dos días entrenados la misma fecha); si no, la agrega.
+export function agregarEntradaHistorial(historial, entrada) {
+  return [...historial.filter((h) => h.fecha !== entrada.fecha), entrada].slice(-40);
+}
+
+// Edita una entrada existente de `historial` (ubicada por fecha original) y
+// propaga el cambio a todas las copias del ejercicio compartidas entre
+// días. `cambios` puede incluir una nueva `fecha` y los campos propios del
+// tipo de ejercicio (series / duracion / distancia). Si la nueva fecha
+// choca con otra entrada ya existente, la edición reemplaza a esa entrada.
+// No toca peso/repsObjetivo/incremento/ajustes: la progresión sigue
+// evolucionando hacia adelante, esto sólo corrige el registro.
+export function editarEntradaHistorial(dias, ejId, fechaOriginal, cambios) {
+  const ej = dias.flatMap((d) => d.ejercicios).find((e) => e.id === ejId);
+  if (!ej) return dias;
+  const idx = ej.historial.findIndex((h) => h.fecha === fechaOriginal);
+  if (idx === -1) return dias;
+  const editada = { ...ej.historial[idx], ...cambios };
+  let historial = ej.historial.map((h, i) => (i === idx ? editada : h));
+  if (cambios.fecha && cambios.fecha !== fechaOriginal) {
+    historial = historial.filter((h, i) => i === idx || h.fecha !== cambios.fecha);
+  }
+  historial = [...historial].sort((a, b) => a.fecha.localeCompare(b.fecha));
+  return actualizarCompartido(dias, ejId, { historial });
+}
+
+// Borra una entrada de `historial` por fecha, propagando entre copias
+// compartidas del mismo ejercicio.
+export function eliminarEntradaHistorial(dias, ejId, fecha) {
+  const ej = dias.flatMap((d) => d.ejercicios).find((e) => e.id === ejId);
+  if (!ej) return dias;
+  return actualizarCompartido(dias, ejId, { historial: ej.historial.filter((h) => h.fecha !== fecha) });
+}
+
 // Agrega a `diaDestinoId` una copia de `ejFuente` que preserva su id y
 // campos compartidos; `configDia` son los campos propios de ese día
 // (series/repsMin/repsMax/descanso, o duracionMin/distanciaKm en cardio),

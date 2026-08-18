@@ -3,6 +3,7 @@ import { fmt, fechaCorta } from "../utils/format";
 import { Marco } from "./Marco";
 import { Etiqueta } from "./Etiqueta";
 import { Boton } from "./Boton";
+import { version } from "../../package.json";
 
 export function Inicio({ dias, aviso, comenzar, irHistorial, irAjustes }) {
   return (
@@ -105,6 +106,10 @@ export function Inicio({ dias, aviso, comenzar, irHistorial, irAjustes }) {
           <Boton tono="fantasma" alto={54} onClick={irAjustes}>
             Ajustes
           </Boton>
+        </div>
+
+        <div style={{ marginTop: 22, textAlign: "center", fontFamily: MONO, fontSize: 11, color: C.gris, opacity: 0.6 }}>
+          v{version}
         </div>
       </div>
     </Marco>

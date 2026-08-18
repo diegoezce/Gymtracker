@@ -12,6 +12,9 @@ import {
   crearDia,
   diaPierdeHistorial,
   moverEjercicioOrden,
+  agregarEntradaHistorial,
+  editarEntradaHistorial,
+  eliminarEntradaHistorial,
 } from "./rutina";
 
 function dosDias() {
@@ -36,6 +39,119 @@ describe("actualizarCompartido", () => {
     const conOtro = [dias[0], { ...dias[1], ejercicios: [otro] }];
     const actualizados = actualizarCompartido(conOtro, banca.id, { peso: 999 });
     expect(actualizados[1].ejercicios[0].peso).toBe(80);
+  });
+});
+
+describe("agregarEntradaHistorial", () => {
+  it("agrega una entrada nueva", () => {
+    const historial = [{ fecha: "2026-08-01", series: [{ peso: 60, reps: 8, rir: 1 }] }];
+    const resultado = agregarEntradaHistorial(historial, { fecha: "2026-08-08", series: [{ peso: 62.5, reps: 8, rir: 1 }] });
+    expect(resultado).toHaveLength(2);
+    expect(resultado[1].fecha).toBe("2026-08-08");
+  });
+
+  it("reemplaza (no duplica) una entrada con la misma fecha", () => {
+    const historial = [{ fecha: "2026-08-01", series: [{ peso: 60, reps: 8, rir: 1 }] }];
+    const resultado = agregarEntradaHistorial(historial, { fecha: "2026-08-01", series: [{ peso: 65, reps: 8, rir: 0 }] });
+    expect(resultado).toHaveLength(1);
+    expect(resultado[0].series[0].peso).toBe(65);
+  });
+
+  it("recorta a las últimas 40 entradas", () => {
+    const historial = Array.from({ length: 40 }, (_, i) => ({ fecha: `2026-01-${String(i + 1).padStart(2, "0")}`, series: [] }));
+    const resultado = agregarEntradaHistorial(historial, { fecha: "2026-03-01", series: [] });
+    expect(resultado).toHaveLength(40);
+    expect(resultado[0].fecha).toBe("2026-01-02");
+    expect(resultado[39].fecha).toBe("2026-03-01");
+  });
+});
+
+describe("editarEntradaHistorial", () => {
+  it("actualiza los campos de la entrada indicada por fecha original", () => {
+    const { dias, banca } = dosDias();
+    const dias2 = actualizarCompartido(dias, banca.id, {
+      historial: [{ fecha: "2026-08-01", series: [{ peso: 60, reps: 8, rir: 1 }] }],
+    });
+    const resultado = editarEntradaHistorial(dias2, banca.id, "2026-08-01", { series: [{ peso: 65, reps: 9, rir: 0 }] });
+    expect(resultado[0].ejercicios[0].historial[0].series[0]).toEqual({ peso: 65, reps: 9, rir: 0 });
+  });
+
+  it("no hace nada si la fecha original no existe", () => {
+    const { dias, banca } = dosDias();
+    const dias2 = actualizarCompartido(dias, banca.id, {
+      historial: [{ fecha: "2026-08-01", series: [{ peso: 60, reps: 8, rir: 1 }] }],
+    });
+    const resultado = editarEntradaHistorial(dias2, banca.id, "2026-09-01", { series: [{ peso: 99, reps: 1, rir: 0 }] });
+    expect(resultado).toBe(dias2);
+  });
+
+  it("se propaga a todas las copias de un ejercicio compartido entre días", () => {
+    const { dias, banca } = dosDias();
+    const vinculado = vincularEjercicio(dias, banca, "b", { series: 4 });
+    const conHistorial = actualizarCompartido(vinculado, banca.id, {
+      historial: [{ fecha: "2026-08-01", series: [{ peso: 60, reps: 8, rir: 1 }] }],
+    });
+    const resultado = editarEntradaHistorial(conHistorial, banca.id, "2026-08-01", { series: [{ peso: 70, reps: 8, rir: 0 }] });
+    expect(resultado[0].ejercicios[0].historial[0].series[0].peso).toBe(70);
+    expect(resultado[1].ejercicios[0].historial[0].series[0].peso).toBe(70);
+  });
+
+  it("si la nueva fecha choca con otra entrada existente, la editada la reemplaza sin duplicar", () => {
+    const { dias, banca } = dosDias();
+    const dias2 = actualizarCompartido(dias, banca.id, {
+      historial: [
+        { fecha: "2026-08-01", series: [{ peso: 60, reps: 8, rir: 1 }] },
+        { fecha: "2026-08-08", series: [{ peso: 62.5, reps: 8, rir: 1 }] },
+      ],
+    });
+    const resultado = editarEntradaHistorial(dias2, banca.id, "2026-08-01", { fecha: "2026-08-08", series: [{ peso: 99, reps: 1, rir: 0 }] });
+    const historial = resultado[0].ejercicios[0].historial;
+    expect(historial).toHaveLength(1);
+    expect(historial[0]).toEqual({ fecha: "2026-08-08", series: [{ peso: 99, reps: 1, rir: 0 }] });
+  });
+
+  it("no toca peso/repsObjetivo/incremento/ajustes del ejercicio", () => {
+    const { dias, banca } = dosDias();
+    const dias2 = actualizarCompartido(dias, banca.id, {
+      historial: [{ fecha: "2026-08-01", series: [{ peso: 60, reps: 8, rir: 1 }] }],
+    });
+    const resultado = editarEntradaHistorial(dias2, banca.id, "2026-08-01", { series: [{ peso: 999, reps: 1, rir: 0 }] });
+    expect(resultado[0].ejercicios[0].peso).toBe(banca.peso);
+  });
+});
+
+describe("eliminarEntradaHistorial", () => {
+  it("quita la entrada indicada", () => {
+    const { dias, banca } = dosDias();
+    const dias2 = actualizarCompartido(dias, banca.id, {
+      historial: [
+        { fecha: "2026-08-01", series: [{ peso: 60, reps: 8, rir: 1 }] },
+        { fecha: "2026-08-08", series: [{ peso: 62.5, reps: 8, rir: 1 }] },
+      ],
+    });
+    const resultado = eliminarEntradaHistorial(dias2, banca.id, "2026-08-01");
+    expect(resultado[0].ejercicios[0].historial).toHaveLength(1);
+    expect(resultado[0].ejercicios[0].historial[0].fecha).toBe("2026-08-08");
+  });
+
+  it("se propaga entre copias compartidas del mismo ejercicio", () => {
+    const { dias, banca } = dosDias();
+    const vinculado = vincularEjercicio(dias, banca, "b", { series: 4 });
+    const conHistorial = actualizarCompartido(vinculado, banca.id, {
+      historial: [{ fecha: "2026-08-01", series: [{ peso: 60, reps: 8, rir: 1 }] }],
+    });
+    const resultado = eliminarEntradaHistorial(conHistorial, banca.id, "2026-08-01");
+    expect(resultado[0].ejercicios[0].historial).toHaveLength(0);
+    expect(resultado[1].ejercicios[0].historial).toHaveLength(0);
+  });
+
+  it("no hace nada si la fecha no existe", () => {
+    const { dias, banca } = dosDias();
+    const dias2 = actualizarCompartido(dias, banca.id, {
+      historial: [{ fecha: "2026-08-01", series: [{ peso: 60, reps: 8, rir: 1 }] }],
+    });
+    const resultado = eliminarEntradaHistorial(dias2, banca.id, "2026-09-01");
+    expect(resultado[0].ejercicios[0].historial).toHaveLength(1);
   });
 });
 

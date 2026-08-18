@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { C, MONO, SANS } from "../theme";
 import { fmt, fechaCorta, diasDesdeStr } from "../utils/format";
 import { diasDondeAparece } from "../domain/rutina";
@@ -5,6 +6,7 @@ import { Marco } from "./Marco";
 import { Cabecera } from "./Cabecera";
 import { Boton } from "./Boton";
 import { Etiqueta } from "./Etiqueta";
+import { DetalleEjercicio } from "./DetalleEjercicio";
 
 function Grafico({ datos, color = C.sodio }) {
   if (!datos.length) return null;
@@ -58,7 +60,8 @@ function Grafico({ datos, color = C.sodio }) {
   );
 }
 
-export function Progreso({ dias, volver }) {
+export function Progreso({ dias, volver, onEditarHistorial, onEliminarHistorial }) {
+  const [detalleId, setDetalleId] = useState(null);
   const ahora = new Date();
 
   // Par único (diaId, fecha) = una sesión
@@ -93,6 +96,18 @@ export function Progreso({ dias, volver }) {
       })
       .map((e) => ({ ...e, diaNombre: diasDondeAparece(dias, e.id).join(" · ") }))
   );
+
+  if (detalleId) {
+    const ejDetalle = ejerciciosConHistorial.find((e) => e.id === detalleId);
+    return (
+      <DetalleEjercicio
+        ejercicio={ejDetalle}
+        onEditar={(fecha, cambios) => onEditarHistorial(ejDetalle.id, fecha, cambios)}
+        onEliminar={(fecha) => onEliminarHistorial(ejDetalle.id, fecha)}
+        volver={() => setDetalleId(null)}
+      />
+    );
+  }
 
   return (
     <Marco>
@@ -146,6 +161,21 @@ export function Progreso({ dias, volver }) {
                 <div style={{ fontFamily: SANS, fontSize: 16, fontWeight: 700, color: C.hueso }}>{e.nombre}</div>
                 <div style={{ fontFamily: MONO, fontSize: 11, color: C.gris }}>{e.diaNombre}</div>
               </div>
+              <button
+                onClick={() => setDetalleId(e.id)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  padding: 0,
+                  marginTop: 2,
+                  color: C.sodio,
+                  fontFamily: SANS,
+                  fontSize: 12,
+                  cursor: "pointer",
+                }}
+              >
+                Ver y editar registros →
+              </button>
             </div>
           );
 

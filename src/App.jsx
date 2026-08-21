@@ -84,13 +84,15 @@ export default function App() {
   // que sólo sale desde el botón explícito de Ajustes. Auto-sync cubre las
   // sesiones, que son aditivas.
 
-  // sesion = { diaId, ejIdx: null | number, pesoActual, series, hechos, saltados }
+  // sesion = { diaId, ejIdx: null | number, pesoActual, series, hechos, progreso, saltados, extra }
   // ejIdx null → menú del día; number → ejercicio en curso
   // saltados vive sólo acá: saltear es "hoy no lo hago", no toca la rutina
+  // extra vive sólo acá también: series de más que el usuario pide en el
+  // momento, no toca ej.series (la plantilla) — ver agregarSerieExtra
 
   const comenzar = (dia) => {
     setAviso("");
-    setSesion({ diaId: dia.id, ejIdx: null, pesoActual: 0, series: [], hechos: {}, progreso: {}, saltados: {} });
+    setSesion({ diaId: dia.id, ejIdx: null, pesoActual: 0, series: [], hechos: {}, progreso: {}, saltados: {}, extra: {} });
   };
 
   const dia = sesion ? dias.find((d) => d.id === sesion.diaId) : null;
@@ -116,9 +118,17 @@ export default function App() {
     setSesion({ ...sesion, ejIdx: null, series: [], hechos: { ...sesion.hechos, [ej.id]: true } });
   };
 
+  // Serie extra = "puedo una más, ahora". Sólo estado de sesión — ej.series
+  // (la plantilla) no cambia, así que no se comparte ni persiste al día siguiente.
+  const agregarSerieExtra = () => {
+    const extra = { ...sesion.extra, [ej.id]: (sesion.extra?.[ej.id] ?? 0) + 1 };
+    setSesion({ ...sesion, extra });
+  };
+
   const guardarSerie = (reps, rir) => {
     const series = [...sesion.series, { peso: sesion.pesoActual, reps, rir }];
-    if (series.length < ej.series) {
+    const objetivoSeries = ej.series + (sesion.extra?.[ej.id] ?? 0);
+    if (series.length < objetivoSeries) {
       setSesion({ ...sesion, series });
       return;
     }
@@ -143,7 +153,8 @@ export default function App() {
 
   const guardarSerieTiempo = (segundos) => {
     const series = [...sesion.series, { segundos }];
-    if (series.length < ej.series) {
+    const objetivoSeries = ej.series + (sesion.extra?.[ej.id] ?? 0);
+    if (series.length < objetivoSeries) {
       setSesion({ ...sesion, series });
       return;
     }
@@ -306,6 +317,7 @@ export default function App() {
         guardarSerie={guardarSerie}
         guardarSerieTiempo={guardarSerieTiempo}
         guardarCardio={guardarCardio}
+        agregarSerieExtra={agregarSerieExtra}
         initialTimerFin={sesion.progreso?.[ej.id]?.timerFin ?? null}
         salir={volverAlMenu}
         terminarEjercicio={() =>

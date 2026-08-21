@@ -157,7 +157,7 @@ function SesionCardio({ ej, guardarCardio, salir }) {
 
 /* ── sesión principal ── */
 
-export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarSerieTiempo, guardarCardio, initialTimerFin = null, salir, terminarEjercicio }) {
+export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarSerieTiempo, guardarCardio, agregarSerieExtra, initialTimerFin = null, salir, terminarEjercicio }) {
   // Restore timer from saved state if returning to an exercise mid-session
   const validoInicial = initialTimerFin && initialTimerFin > Date.now() ? initialTimerFin : null;
   const [timerFin, setTimerFin] = useState(validoInicial);
@@ -168,7 +168,8 @@ export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarSerieT
   // Skip the timer-start effect on mount so a restored timer isn't overwritten
   const mountHandled = useRef(false);
 
-  const hayMasSeries = sesion.series.length > 0 && sesion.series.length < ej.series;
+  const objetivoSeries = ej.series + (sesion.extra?.[ej.id] ?? 0);
+  const hayMasSeries = sesion.series.length > 0 && sesion.series.length < objetivoSeries;
   const esTiempo = ej.tipo === "tiempo";
   const historialPrevio = ej.historial.filter((h) => h.fecha !== hoy());
   const ultimaSerie = !esTiempo
@@ -275,12 +276,28 @@ export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarSerieT
             )}
           </div>
           <Etiqueta>
-            Serie {sesion.series.length + 1} de {ej.series} · objetivo{" "}
+            Serie {sesion.series.length + 1} de {objetivoSeries} · objetivo{" "}
             {esTiempo
               ? `${ej.duracionObjetivo}s`
               : `${ej.repsMax ? `${ej.repsObjetivo}–${ej.repsMax}` : ej.repsObjetivo} reps`}
             {ej.descanso ? ` · ${ej.descanso}s descanso` : ""}
           </Etiqueta>
+          <button
+            onClick={agregarSerieExtra}
+            style={{
+              background: "none",
+              border: "none",
+              padding: 0,
+              marginTop: 6,
+              color: C.sodio,
+              fontFamily: SANS,
+              fontSize: 12,
+              cursor: "pointer",
+              WebkitTapHighlightColor: "transparent",
+            }}
+          >
+            + agregar una serie más
+          </button>
 
           {!esTiempo && (
             <div style={{ marginTop: 6, fontFamily: MONO, fontSize: 12, color: C.gris, opacity: 0.75 }}>

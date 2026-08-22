@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { storage, CLAVE_RUTINA } from "./storage";
-import { RUTINA_INICIAL, actualizarCompartido, vincularEjercicio, resincronizarCompartidos, agregarEntradaHistorial, editarEntradaHistorial, eliminarEntradaHistorial } from "./domain/rutina";
+import { RUTINA_INICIAL, actualizarCompartido, vincularEjercicio, resincronizarCompartidos, agregarEntradaHistorial, editarEntradaHistorial, eliminarEntradaHistorial, fusionarEjercicios } from "./domain/rutina";
 import { leerToken, leerAutoSync, fetchSesiones, aplicarSesiones, pushSesiones, construirSesiones, fetchRutina, aplicarRutina, SYNC_KEY, TOKEN_KEY } from "./sync/hcAdapter";
 import { progresar, aprender } from "./domain/progression";
 import { hoy } from "./utils/format";
@@ -272,6 +272,12 @@ export default function App() {
     syncSilencioso(nuevos);
   };
 
+  const fusionarHistorial = (idSuperviviente, idPerdedor) => {
+    const nuevos = fusionarEjercicios(dias, idSuperviviente, idPerdedor);
+    setDias(nuevos);
+    syncSilencioso(nuevos);
+  };
+
   // Agrega ejFuente (existente en otro día, o recién creado) a diaId,
   // preservando su id si ya existía en otro lado para que compartan progreso.
   const agregarEjercicioADia = (diaId, ejFuente, configDia = {}) => {
@@ -347,6 +353,7 @@ export default function App() {
         volver={() => setPantalla("inicio")}
         onEditarHistorial={editarHistorial}
         onEliminarHistorial={eliminarHistorial}
+        onFusionarHistorial={fusionarHistorial}
       />
     );
 

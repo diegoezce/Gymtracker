@@ -110,11 +110,26 @@ export function actualizarCompartido(dias, id, cambios) {
 
 // ── edición de historial ───────────────────────────────────────
 
-// Reemplaza la entrada con la misma fecha si ya existe (evita duplicados
-// cuando el mismo ejercicio se cierra dos veces el mismo día, p.ej. por
-// estar vinculado a dos días entrenados la misma fecha); si no, la agrega.
+// Agrega una entrada al historial. Si ya hay una entrada para esa fecha
+// (p.ej. se entrenó el mismo ejercicio dos veces en el día — mañana y
+// tarde, o porque está vinculado a dos días entrenados la misma fecha),
+// se fusiona con la existente en vez de reemplazarla, para que ambas
+// sesiones del día queden juntas bajo una sola entrada.
 export function agregarEntradaHistorial(historial, entrada) {
-  return [...historial.filter((h) => h.fecha !== entrada.fecha), entrada].slice(-40);
+  const existente = historial.find((h) => h.fecha === entrada.fecha);
+  const fusionada = !existente
+    ? entrada
+    : entrada.series
+    ? { ...entrada, series: [...(existente.series ?? []), ...entrada.series] }
+    : {
+        ...entrada,
+        duracion: (existente.duracion ?? 0) + (entrada.duracion ?? 0),
+        distancia:
+          existente.distancia != null || entrada.distancia != null
+            ? (existente.distancia ?? 0) + (entrada.distancia ?? 0)
+            : null,
+      };
+  return [...historial.filter((h) => h.fecha !== entrada.fecha), fusionada].slice(-40);
 }
 
 // Edita una entrada existente de `historial` (ubicada por fecha original) y

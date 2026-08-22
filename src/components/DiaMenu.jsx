@@ -24,6 +24,44 @@ const ACCION_BTN = {
   WebkitTapHighlightColor: "transparent",
 };
 
+function ConfirmarTerminarSesion({ onConfirmar, onCancelar }) {
+  return (
+    <div
+      onClick={onCancelar}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.82)",
+        zIndex: 100,
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "flex-end",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: C.sup,
+          borderRadius: "16px 16px 0 0",
+          padding: "20px 20px 32px",
+        }}
+      >
+        <div style={{ width: 36, height: 4, background: C.linea, borderRadius: 2, margin: "0 auto 20px" }} />
+        <div style={{ fontFamily: SANS, fontSize: 18, fontWeight: 700, color: C.hueso, marginBottom: 8, textAlign: "center" }}>
+          ¿Terminar la sesión?
+        </div>
+        <div style={{ fontFamily: SANS, fontSize: 14, color: C.gris, textAlign: "center", marginBottom: 22, lineHeight: 1.4 }}>
+          Lo que ya registraste queda guardado.
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <Boton tono="fuerte" alto={54} onClick={onConfirmar}>Sí, terminar sesión</Boton>
+          <Boton tono="fantasma" alto={48} onClick={onCancelar}>Cancelar</Boton>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function DiaMenu({
   dia,
   dias,
@@ -36,6 +74,7 @@ export function DiaMenu({
   onAgregarEjercicio,
 }) {
   const [agregando, setAgregando] = useState(false);
+  const [confirmandoSalir, setConfirmandoSalir] = useState(false);
   const total = dia.ejercicios.filter((e) => !saltados[e.id]).length;
   const doneCount = Object.keys(hechos).length;
 
@@ -58,7 +97,13 @@ export function DiaMenu({
 
   return (
     <Marco>
-      <Cabecera izq={`${dia.nombre} · ${doneCount}/${total}`} onSalir={onTerminar} />
+      {confirmandoSalir && (
+        <ConfirmarTerminarSesion
+          onConfirmar={onTerminar}
+          onCancelar={() => setConfirmandoSalir(false)}
+        />
+      )}
+      <Cabecera izq={`${dia.nombre} · ${doneCount}/${total}`} onSalir={() => setConfirmandoSalir(true)} />
       <div style={{ padding: "8px 20px 40px" }}>
         <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
           {dia.ejercicios.map((e, idx) => {
@@ -175,7 +220,7 @@ export function DiaMenu({
         </div>
 
         <div style={{ marginTop: 16 }}>
-          <Boton tono="fantasma" alto={54} onClick={onTerminar}>
+          <Boton tono="fantasma" alto={54} onClick={() => setConfirmandoSalir(true)}>
             Terminar sesión
           </Boton>
         </div>

@@ -17,6 +17,7 @@ import {
   eliminarEntradaHistorial,
   ejerciciosFusionables,
   fusionarEjercicios,
+  fusionarDias,
 } from "./rutina";
 
 function dosDias() {
@@ -555,5 +556,54 @@ describe("fusionarEjercicios", () => {
     const copiasDeA = resultado.flatMap((d) => d.ejercicios).filter((e) => e.id === a.id);
     expect(copiasDeA.length).toBeGreaterThanOrEqual(2);
     copiasDeA.forEach((e) => expect(e.historial).toEqual(copiasDeA[0].historial));
+  });
+});
+
+describe("fusionarDias", () => {
+  function dosDiasConEjercicios() {
+    const banca = { ...ejercicio("Press banca", 60), historial: [{ fecha: "2026-07-01", series: [{ peso: 60, reps: 8, rir: 1 }] }] };
+    const sentadilla = ejercicio("Sentadilla", 80);
+    const diaA = { id: "a", nombre: "Día A", ejercicios: [banca] };
+    const diaB = { id: "b", nombre: "Día B", ejercicios: [sentadilla] };
+    return { dias: [diaA, diaB], banca, sentadilla };
+  }
+
+  it("junta los ejercicios de ambos días bajo el sobreviviente", () => {
+    const { dias, banca, sentadilla } = dosDiasConEjercicios();
+    const resultado = fusionarDias(dias, "a", "b");
+    expect(resultado).toHaveLength(1);
+    expect(resultado[0].id).toBe("a");
+    expect(resultado[0].ejercicios.map((e) => e.id)).toEqual([banca.id, sentadilla.id]);
+  });
+
+  it("conserva el historial de los ejercicios movidos, intacto", () => {
+    const { dias, banca } = dosDiasConEjercicios();
+    const resultado = fusionarDias(dias, "b", "a");
+    const bancaMovida = resultado[0].ejercicios.find((e) => e.id === banca.id);
+    expect(bancaMovida.historial).toEqual(banca.historial);
+  });
+
+  it("no duplica un ejercicio ya compartido (mismo id) entre ambos días", () => {
+    const { dias, banca } = dosDiasConEjercicios();
+    const vinculado = vincularEjercicio(dias, banca, "b");
+    const resultado = fusionarDias(vinculado, "a", "b");
+    const idsEnA = resultado[0].ejercicios.map((e) => e.id);
+    expect(idsEnA.filter((id) => id === banca.id)).toHaveLength(1);
+  });
+
+  it("el perdedor desaparece de la lista de días", () => {
+    const { dias } = dosDiasConEjercicios();
+    const resultado = fusionarDias(dias, "a", "b");
+    expect(resultado.find((d) => d.id === "b")).toBeUndefined();
+  });
+
+  it("no-op si los ids son iguales", () => {
+    const { dias } = dosDiasConEjercicios();
+    expect(fusionarDias(dias, "a", "a")).toBe(dias);
+  });
+
+  it("no-op si algún id no existe", () => {
+    const { dias } = dosDiasConEjercicios();
+    expect(fusionarDias(dias, "a", "no-existe")).toBe(dias);
   });
 });

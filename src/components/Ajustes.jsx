@@ -10,6 +10,7 @@ import {
   crearDia,
   diaPierdeHistorial,
   moverEjercicioOrden,
+  fusionarDias,
 } from "../domain/rutina";
 import { Marco } from "./Marco";
 import { Cabecera } from "./Cabecera";
@@ -938,6 +939,67 @@ function VersionPanel() {
   );
 }
 
+function SelectorFusionDia({ dia, candidatos, onConfirmar, volver }) {
+  const [elegido, setElegido] = useState(null);
+
+  if (elegido) {
+    return (
+      <Marco>
+        <Cabecera izq="Fusionar días" onSalir={() => setElegido(null)} />
+        <div style={{ padding: "8px 20px 40px" }}>
+          <div style={{ padding: "14px 16px", background: "#2a1a1a", border: `1px solid #3a2a2a`, borderRadius: 6 }}>
+            <div style={{ fontFamily: SANS, fontSize: 14, color: C.hueso, lineHeight: 1.5 }}>
+              Se va a fusionar <strong>"{elegido.nombre}"</strong> con <strong>"{dia.nombre}"</strong>.
+              Los ejercicios de ambos quedan juntos bajo <strong>"{dia.nombre}"</strong> y "{elegido.nombre}"
+              desaparece. Los que ya compartían los dos días no se duplican. No se puede deshacer.
+            </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+              <button onClick={() => setElegido(null)} style={CONFIRM_BTN}>Cancelar</button>
+              <button
+                onClick={() => onConfirmar(elegido.id)}
+                style={{ ...CONFIRM_BTN, color: "#c0392b", borderColor: "#3a2a2a" }}
+              >
+                Sí, fusionar
+              </button>
+            </div>
+          </div>
+        </div>
+      </Marco>
+    );
+  }
+
+  return (
+    <Marco>
+      <Cabecera izq="Fusionar con..." onSalir={volver} />
+      <div style={{ padding: "8px 20px 40px" }}>
+        {candidatos.length === 0 ? (
+          <p style={{ fontFamily: SANS, color: C.gris, fontSize: 14, marginTop: 20, lineHeight: 1.5 }}>
+            No hay otro día para fusionar.
+          </p>
+        ) : (
+          <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 8 }}>
+            {candidatos.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => setElegido(c)}
+                style={{ width: "100%", textAlign: "left", background: C.sup, border: `1px solid ${C.linea}`, borderRadius: 6, padding: "14px 16px", cursor: "pointer", WebkitTapHighlightColor: "transparent" }}
+              >
+                <div style={{ fontFamily: SANS, fontSize: 16, fontWeight: 600, color: C.hueso }}>{c.nombre}</div>
+                <div style={{ fontFamily: MONO, fontSize: 12, color: C.gris, marginTop: 4 }}>
+                  {c.ejercicios.length} ejercicio{c.ejercicios.length !== 1 ? "s" : ""}
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+        <div style={{ marginTop: 20 }}>
+          <Boton tono="fantasma" alto={54} onClick={volver}>Cancelar</Boton>
+        </div>
+      </div>
+    </Marco>
+  );
+}
+
 /* ── pantalla principal ── */
 
 // Campos compartidos entre copias del mismo ejercicio en distintos días —
@@ -947,6 +1009,7 @@ const CAMPOS_COMPARTIDOS = new Set(["nombre", "peso", "incremento", "repsObjetiv
 export function Ajustes({ dias, setDias, agregarEjercicioADia, traerHistorialDeHC, aplicarRutinaDeHC, onImportarRutina, volver }) {
   const [agregandoEnDia, setAgregandoEnDia] = useState(null);
   const [confirmandoQuitarDia, setConfirmandoQuitarDia] = useState(null);
+  const [fusionandoDia, setFusionandoDia] = useState(null);
   // Colapsado por default (la lista de días se hace larga); un día recién
   // creado se abre solo, para poder cargarle ejercicios sin un tap extra.
   const [colapsados, setColapsados] = useState({});
@@ -996,6 +1059,21 @@ export function Ajustes({ dias, setDias, agregarEjercicioADia, traerHistorialDeH
   // borrar sin querer con un tap de más. diaPierdeHistorial sólo decide
   // qué tan fuerte es el aviso.
   const intentarQuitarDia = (diaId) => setConfirmandoQuitarDia(diaId);
+
+  if (fusionandoDia) {
+    const dia = dias.find((d) => d.id === fusionandoDia);
+    return (
+      <SelectorFusionDia
+        dia={dia}
+        candidatos={dias.filter((d) => d.id !== fusionandoDia)}
+        onConfirmar={(otroId) => {
+          setDias(fusionarDias(dias, fusionandoDia, otroId));
+          setFusionandoDia(null);
+        }}
+        volver={() => setFusionandoDia(null)}
+      />
+    );
+  }
 
   if (agregandoEnDia) {
     return (
@@ -1102,6 +1180,15 @@ export function Ajustes({ dias, setDias, agregarEjercicioADia, traerHistorialDeH
                 >
                   + Agregar ejercicio
                 </button>
+
+                {dias.length > 1 && (
+                  <button
+                    onClick={() => setFusionandoDia(d.id)}
+                    style={{ width: "100%", marginTop: 8, background: "none", border: `1px dashed ${C.linea}`, borderRadius: 6, color: C.gris, fontFamily: SANS, fontSize: 14, padding: "13px 0", cursor: "pointer" }}
+                  >
+                    Fusionar con otro día...
+                  </button>
+                )}
               </>
             )}
           </div>

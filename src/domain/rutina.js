@@ -293,6 +293,26 @@ export function fusionarEjercicios(dias, idSuperviviente, idPerdedor) {
   }));
 }
 
+// Fusiona dos días: el sobreviviente conserva su id y nombre; los
+// ejercicios del perdedor se agregan a su lista (sin duplicar los que ya
+// comparte, por id, con el sobreviviente), y el perdedor desaparece de
+// `dias`. No hay nada que hacer con historial — vive en cada ejercicio, no
+// en el día, así que viaja solo junto con cada uno. No-op si falta algún
+// id o si son el mismo día.
+export function fusionarDias(dias, idSuperviviente, idPerdedor) {
+  if (idSuperviviente === idPerdedor) return dias;
+  const superviviente = dias.find((d) => d.id === idSuperviviente);
+  const perdedor = dias.find((d) => d.id === idPerdedor);
+  if (!superviviente || !perdedor) return dias;
+
+  const idsExistentes = new Set(superviviente.ejercicios.map((e) => e.id));
+  const ejerciciosAAgregar = perdedor.ejercicios.filter((e) => !idsExistentes.has(e.id));
+
+  return dias
+    .filter((d) => d.id !== idPerdedor)
+    .map((d) => (d.id === idSuperviviente ? { ...d, ejercicios: [...d.ejercicios, ...ejerciciosAAgregar] } : d));
+}
+
 export const RUTINA_INICIAL = [
   {
     id: "a",

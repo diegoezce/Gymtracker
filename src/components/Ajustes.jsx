@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { version } from "../../package.json";
 import { C, MONO, SANS } from "../theme";
 import { exportarRutina, importarRutina, resumenDias } from "../domain/compartir";
 import {
@@ -878,6 +879,65 @@ function SyncPanel({ dias, traerHistorialDeHC, aplicarRutinaDeHC }) {
   );
 }
 
+function VersionPanel() {
+  const [estado, setEstado] = useState("idle"); // idle | buscando | al-dia | actualizando | error | sin-sw
+  const cargando = estado === "buscando";
+
+  async function buscarActualizaciones() {
+    setEstado("buscando");
+    try {
+      if (!("serviceWorker" in navigator)) { setEstado("sin-sw"); return; }
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (!reg) { setEstado("sin-sw"); return; }
+      await reg.update();
+      // el fetch de reg.update() puede resolver antes de que el SW nuevo
+      // termine de instalarse y quede "waiting" — le damos un margen corto.
+      for (let i = 0; i < 10 && !reg.waiting; i++) {
+        await new Promise((r) => setTimeout(r, 400));
+      }
+      if (reg.waiting) {
+        reg.waiting.postMessage({ type: "SKIP_WAITING" });
+        setEstado("actualizando");
+      } else {
+        setEstado("al-dia");
+      }
+    } catch (e) {
+      setEstado("error");
+    }
+  }
+
+  const mensaje = {
+    "al-dia": "Ya tenés la última versión.",
+    actualizando: "Hay una versión nueva — actualizando, la app se va a recargar sola.",
+    error: "No se pudo chequear. Probá de nuevo.",
+    "sin-sw": "Esta vista previa no tiene actualización automática disponible.",
+  }[estado];
+
+  return (
+    <div style={{ marginTop: 36, paddingTop: 24, borderTop: `1px solid ${C.linea}` }}>
+      <div style={{ fontFamily: SANS, fontSize: 16, fontWeight: 700, color: C.hueso, marginBottom: 16 }}>
+        Versión
+      </div>
+      <div style={{ fontFamily: MONO, fontSize: 12, color: C.gris, marginBottom: 12 }}>
+        Instalada: <span style={{ color: C.hueso }}>v{version}</span>
+      </div>
+      <Boton
+        tono={cargando ? "neutro" : "fantasma"}
+        alto={48}
+        onClick={buscarActualizaciones}
+        style={{ opacity: cargando ? 0.5 : 1 }}
+      >
+        {cargando ? "Buscando…" : "Buscar actualizaciones"}
+      </Boton>
+      {mensaje && (
+        <div style={{ marginTop: 10, fontFamily: SANS, fontSize: 13, color: estado === "error" ? C.oxido : C.verde }}>
+          {mensaje}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ── pantalla principal ── */
 
 // Campos compartidos entre copias del mismo ejercicio en distintos días —
@@ -1062,6 +1122,8 @@ export function Ajustes({ dias, setDias, agregarEjercicioADia, traerHistorialDeH
           traerHistorialDeHC={traerHistorialDeHC}
           aplicarRutinaDeHC={aplicarRutinaDeHC}
         />
+
+        <VersionPanel />
 
         <div style={{ marginTop: 28 }}>
           <Boton tono="fuerte" alto={54} onClick={volver}>

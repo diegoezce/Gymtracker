@@ -15,6 +15,8 @@ import {
   agregarEntradaHistorial,
   editarEntradaHistorial,
   eliminarEntradaHistorial,
+  ejerciciosFusionables,
+  fusionarEjercicios,
 } from "./rutina";
 
 function dosDias() {
@@ -447,5 +449,111 @@ describe("resincronizarCompartidos con tipo tiempo", () => {
     expect(resultado[1].ejercicios[0].duracionObjetivo).toBe(35);
     expect(resultado[0].ejercicios[0].historial).toEqual(resultado[1].ejercicios[0].historial);
     expect(resultado[0].ejercicios[0].historial.map((h) => h.fecha)).toEqual(["2026-07-01", "2026-07-10"]);
+  });
+});
+
+describe("ejerciciosFusionables", () => {
+  it("lista otros ejercicios del mismo tipo, excluyendo el propio", () => {
+    const { dias, banca } = dosDias();
+    const sentadilla = ejercicio("Sentadilla", 80);
+    const cardio = ejercicioCardio("Cardio");
+    const conMas = [
+      dias[0],
+      { ...dias[1], ejercicios: [sentadilla, cardio] },
+    ];
+    const candidatos = ejerciciosFusionables(conMas, banca.id);
+    expect(candidatos.map((c) => c.id)).toEqual([sentadilla.id]);
+  });
+
+  it("dedupea por id entre días y anota diasDonde", () => {
+    const { dias, banca } = dosDias();
+    const otro = ejercicio("Press militar", 40);
+    const vinculado = vincularEjercicio([dias[0], { ...dias[1], ejercicios: [otro] }], otro, "a");
+    const candidatos = ejerciciosFusionables(vinculado, banca.id);
+    expect(candidatos).toHaveLength(1);
+    expect(candidatos[0].diasDonde).toEqual(["Día A", "Día B"]);
+  });
+
+  it("devuelve [] si el id no existe", () => {
+    const { dias } = dosDias();
+    expect(ejerciciosFusionables(dias, "no-existe")).toEqual([]);
+  });
+});
+
+describe("fusionarEjercicios", () => {
+  function dosEjerciciosConHistorial() {
+    const a = { ...ejercicio("Press banca", 60, 2.5, 3, 8, 10, 90), historial: [{ fecha: "2026-07-01", series: [{ peso: 60, reps: 8, rir: 1 }] }] };
+    const b = { ...ejercicio("Press de banca plano", 65, 2.5, 4, 6, 8, 120), historial: [{ fecha: "2026-07-10", series: [{ peso: 65, reps: 6, rir: 0 }] }] };
+    const dias = [
+      { id: "x", nombre: "Día X", ejercicios: [a] },
+      { id: "y", nombre: "Día Y", ejercicios: [b] },
+    ];
+    return { dias, a, b };
+  }
+
+  it("une el historial de ambos, ordenado y sin duplicar fechas", () => {
+    const { dias, a, b } = dosEjerciciosConHistorial();
+    const resultado = fusionarEjercicios(dias, a.id, b.id);
+    const fusionado = resultado[0].ejercicios[0];
+    expect(fusionado.historial.map((h) => h.fecha)).toEqual(["2026-07-01", "2026-07-10"]);
+  });
+
+  it("el sobreviviente conserva su nombre y su id; el perdedor pasa a tener ambos", () => {
+    const { dias, a, b } = dosEjerciciosConHistorial();
+    const resultado = fusionarEjercicios(dias, a.id, b.id);
+    expect(resultado[0].ejercicios[0].id).toBe(a.id);
+    expect(resultado[0].ejercicios[0].nombre).toBe("Press banca");
+    expect(resultado[1].ejercicios[0].id).toBe(a.id);
+    expect(resultado[1].ejercicios[0].nombre).toBe("Press banca");
+  });
+
+  it("toma peso/repsObjetivo/incremento/ajustes de la copia con historial más reciente", () => {
+    const { dias, a, b } = dosEjerciciosConHistorial();
+    const resultado = fusionarEjercicios(dias, a.id, b.id);
+    // b tiene la fecha más reciente (2026-07-10) → sus campos de progresión ganan
+    expect(resultado[0].ejercicios[0].peso).toBe(65);
+    expect(resultado[1].ejercicios[0].peso).toBe(65);
+  });
+
+  it("en empate de fecha, gana el sobreviviente", () => {
+    const { dias, a, b } = dosEjerciciosConHistorial();
+    const mismaFecha = dias.map((d) => ({
+      ...d,
+      ejercicios: d.ejercicios.map((e) => ({ ...e, historial: [{ ...e.historial[0], fecha: "2026-07-01" }] })),
+    }));
+    const resultado = fusionarEjercicios(mismaFecha, a.id, b.id);
+    expect(resultado[0].ejercicios[0].peso).toBe(60); // el de `a`, el sobreviviente
+  });
+
+  it("no toca series/repsMin/repsMax/descanso propios de cada día", () => {
+    const { dias, a, b } = dosEjerciciosConHistorial();
+    const resultado = fusionarEjercicios(dias, a.id, b.id);
+    expect(resultado[0].ejercicios[0].series).toBe(3);
+    expect(resultado[0].ejercicios[0].repsMin).toBe(8);
+    expect(resultado[1].ejercicios[0].series).toBe(4);
+    expect(resultado[1].ejercicios[0].repsMin).toBe(6);
+  });
+
+  it("no-op si los tipos no coinciden", () => {
+    const { dias, a } = dosEjerciciosConHistorial();
+    const cardio = ejercicioCardio("Cardio");
+    const conCardio = [dias[0], { ...dias[1], ejercicios: [cardio] }];
+    const resultado = fusionarEjercicios(conCardio, a.id, cardio.id);
+    expect(resultado).toEqual(conCardio);
+  });
+
+  it("no-op si algún id no existe", () => {
+    const { dias, a } = dosEjerciciosConHistorial();
+    const resultado = fusionarEjercicios(dias, a.id, "no-existe");
+    expect(resultado).toEqual(dias);
+  });
+
+  it("propaga el resultado a todas las copias existentes de ambos ids", () => {
+    const { dias, a, b } = dosEjerciciosConHistorial();
+    const conCopiaDeA = vincularEjercicio(dias, a, "y");
+    const resultado = fusionarEjercicios(conCopiaDeA, a.id, b.id);
+    const copiasDeA = resultado.flatMap((d) => d.ejercicios).filter((e) => e.id === a.id);
+    expect(copiasDeA.length).toBeGreaterThanOrEqual(2);
+    copiasDeA.forEach((e) => expect(e.historial).toEqual(copiasDeA[0].historial));
   });
 });

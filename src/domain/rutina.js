@@ -226,6 +226,73 @@ export function resincronizarCompartidos(dias) {
   }));
 }
 
+// Candidatos para fusionar con `ejId`: cualquier otro ejercicio, en cualquier
+// día (a diferencia de ejerciciosVinculables, acá no importa en qué día está
+// `ejId`), del mismo tipo, deduplicado por id.
+export function ejerciciosFusionables(dias, ejId) {
+  const actual = dias.flatMap((d) => d.ejercicios).find((e) => e.id === ejId);
+  if (!actual) return [];
+  const vistos = new Set([ejId]);
+  const resultado = [];
+  dias.forEach((d) => {
+    d.ejercicios.forEach((e) => {
+      if (e.tipo !== actual.tipo || vistos.has(e.id)) return;
+      vistos.add(e.id);
+      resultado.push({ ...e, diasDonde: diasDondeAparece(dias, e.id) });
+    });
+  });
+  return resultado;
+}
+
+// Fusiona dos ejercicios que son el mismo movimiento real bajo identidades
+// separadas (p.ej. tipeados con nombres distintos en días distintos). El
+// sobreviviente (idSuperviviente) conserva su nombre; toda copia de
+// idPerdedor, en cualquier día, pasa a tener su id y nombre. El historial de
+// ambos se une igual que resincronizarCompartidos (dedupe por fecha, orden
+// ascendente, recorte a 40); peso/repsObjetivo/incremento/ajustes (o
+// duracionObjetivo/incremento) se toman de la copia con historial más
+// reciente — empate a favor del sobreviviente. Los campos propios de cada
+// día (series/repsMin/repsMax/descanso, o duracionMin/distanciaKm) no se
+// tocan. No-op si falta algún id o si los tipos no coinciden.
+export function fusionarEjercicios(dias, idSuperviviente, idPerdedor) {
+  if (idSuperviviente === idPerdedor) return dias;
+  const todos = dias.flatMap((d) => d.ejercicios);
+  const superviviente = todos.find((e) => e.id === idSuperviviente);
+  const perdedor = todos.find((e) => e.id === idPerdedor);
+  if (!superviviente || !perdedor) return dias;
+  if (superviviente.tipo !== perdedor.tipo) return dias;
+
+  const porFecha = new Map();
+  [...(superviviente.historial ?? []), ...(perdedor.historial ?? [])].forEach((h) => porFecha.set(h.fecha, h));
+  const historial = [...porFecha.values()].sort((a, b) => a.fecha.localeCompare(b.fecha)).slice(-40);
+
+  const fSuperviviente = superviviente.historial?.[superviviente.historial.length - 1]?.fecha ?? "";
+  const fPerdedor = perdedor.historial?.[perdedor.historial.length - 1]?.fecha ?? "";
+  const masReciente = fPerdedor > fSuperviviente ? perdedor : superviviente;
+
+  const camposFusionados =
+    superviviente.tipo === "cardio"
+      ? { historial }
+      : superviviente.tipo === "tiempo"
+      ? { historial, duracionObjetivo: masReciente.duracionObjetivo, incremento: masReciente.incremento }
+      : {
+          historial,
+          peso: masReciente.peso,
+          repsObjetivo: masReciente.repsObjetivo,
+          incremento: masReciente.incremento,
+          ajustes: masReciente.ajustes,
+        };
+
+  return dias.map((d) => ({
+    ...d,
+    ejercicios: d.ejercicios.map((e) => {
+      if (e.id === idPerdedor) return { ...e, ...camposFusionados, id: idSuperviviente, nombre: superviviente.nombre };
+      if (e.id === idSuperviviente) return { ...e, ...camposFusionados };
+      return e;
+    }),
+  }));
+}
+
 export const RUTINA_INICIAL = [
   {
     id: "a",

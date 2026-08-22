@@ -60,7 +60,7 @@ function Grafico({ datos, color = C.sodio }) {
   );
 }
 
-export function Progreso({ dias, volver, onEditarHistorial, onEliminarHistorial }) {
+export function Progreso({ dias, volver, onEditarHistorial, onEliminarHistorial, onFusionarHistorial }) {
   const [detalleId, setDetalleId] = useState(null);
   const ahora = new Date();
 
@@ -102,8 +102,10 @@ export function Progreso({ dias, volver, onEditarHistorial, onEliminarHistorial 
     return (
       <DetalleEjercicio
         ejercicio={ejDetalle}
+        dias={dias}
         onEditar={(fecha, cambios) => onEditarHistorial(ejDetalle.id, fecha, cambios)}
         onEliminar={(fecha) => onEliminarHistorial(ejDetalle.id, fecha)}
+        onFusionar={(otroId) => onFusionarHistorial(ejDetalle.id, otroId)}
         volver={() => setDetalleId(null)}
       />
     );

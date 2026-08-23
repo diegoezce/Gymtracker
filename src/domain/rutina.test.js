@@ -53,11 +53,21 @@ describe("agregarEntradaHistorial", () => {
     expect(resultado[1].fecha).toBe("2026-08-08");
   });
 
-  it("reemplaza (no duplica) una entrada con la misma fecha", () => {
+  it("fusiona (no duplica) las series de una entrada con la misma fecha — dos sesiones el mismo día", () => {
     const historial = [{ fecha: "2026-08-01", series: [{ peso: 60, reps: 8, rir: 1 }] }];
     const resultado = agregarEntradaHistorial(historial, { fecha: "2026-08-01", series: [{ peso: 65, reps: 8, rir: 0 }] });
     expect(resultado).toHaveLength(1);
-    expect(resultado[0].series[0].peso).toBe(65);
+    expect(resultado[0].series).toEqual([
+      { peso: 60, reps: 8, rir: 1 },
+      { peso: 65, reps: 8, rir: 0 },
+    ]);
+  });
+
+  it("suma duracion/distancia de cardio cuando ya hay una entrada ese día", () => {
+    const historial = [{ fecha: "2026-08-01", duracion: 20, distancia: 3 }];
+    const resultado = agregarEntradaHistorial(historial, { fecha: "2026-08-01", duracion: 15, distancia: 2 });
+    expect(resultado).toHaveLength(1);
+    expect(resultado[0]).toMatchObject({ duracion: 35, distancia: 5 });
   });
 
   it("recorta a las últimas 40 entradas", () => {

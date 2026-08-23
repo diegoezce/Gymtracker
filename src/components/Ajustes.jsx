@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { version } from "../../package.json";
 import { C, MONO, SANS } from "../theme";
 import { exportarRutina, importarRutina, resumenDias } from "../domain/compartir";
@@ -880,6 +880,154 @@ function SyncPanel({ dias, traerHistorialDeHC, aplicarRutinaDeHC }) {
   );
 }
 
+function esStandalone() {
+  return (
+    window.navigator.standalone === true ||
+    window.matchMedia?.("(display-mode: standalone)").matches === true
+  );
+}
+
+function NotificacionesPanel() {
+  const soportado = "Notification" in window;
+  const [permiso, setPermiso] = useState(soportado ? Notification.permission : null);
+  const [pidiendo, setPidiendo] = useState(false);
+  const [prueba, setPrueba] = useState("idle"); // idle | enviada | sin-sw | error
+
+  // Si va a Ajustes del iPhone a desbloquearlas y vuelve, la app se reanuda
+  // sin recargar: hay que releer el permiso al volver a primer plano.
+  useEffect(() => {
+    if (!soportado) return;
+    const releer = () => {
+      if (document.visibilityState === "visible") setPermiso(Notification.permission);
+    };
+    document.addEventListener("visibilitychange", releer);
+    window.addEventListener("focus", releer);
+    return () => {
+      document.removeEventListener("visibilitychange", releer);
+      window.removeEventListener("focus", releer);
+    };
+  }, [soportado]);
+
+  // OJO: requestPermission() tiene que salir de un gesto real del usuario.
+  // Se llama sincrónicamente dentro del onClick, sin ningún await antes.
+  function activar() {
+    const aplicar = (r) => {
+      setPermiso(r ?? Notification.permission);
+      setPidiendo(false);
+    };
+    try {
+      const p = Notification.requestPermission(aplicar); // forma legacy con callback
+      setPidiendo(true);
+      if (p && typeof p.then === "function") p.then(aplicar, () => aplicar());
+    } catch (_) {
+      aplicar();
+    }
+  }
+
+  // Manda la notificación por el mismo camino que el timer real (service
+  // worker + setTimeout) para probar la cadena completa, no sólo el permiso.
+  async function probar() {
+    setPrueba("idle");
+    try {
+      if (!("serviceWorker" in navigator)) { setPrueba("sin-sw"); return; }
+      const existe = await navigator.serviceWorker.getRegistration();
+      if (!existe) { setPrueba("sin-sw"); return; }
+      const reg = await navigator.serviceWorker.ready;
+      if (!reg.active) { setPrueba("error"); return; }
+      reg.active.postMessage({
+        type: "SCHEDULE_NOTIFICATION",
+        tag: "prueba-notif",
+        title: "Prueba de notificación",
+        body: "Si ves esto, el aviso de fin de descanso te va a llegar.",
+        timestamp: Date.now() + 5000,
+      });
+      setPrueba("enviada");
+    } catch (_) {
+      setPrueba("error");
+    }
+  }
+
+  const mensajePrueba = {
+    enviada: "Listo — bloqueá la pantalla ahora. En 5 segundos tiene que sonar.",
+    "sin-sw": "No hay service worker activo. Recargá la app y probá de nuevo.",
+    error: "No se pudo enviar la prueba.",
+  }[prueba];
+
+  return (
+    <div style={{ marginTop: 36, paddingTop: 24, borderTop: `1px solid ${C.linea}` }}>
+      <div style={{ fontFamily: SANS, fontSize: 16, fontWeight: 700, color: C.hueso, marginBottom: 16 }}>
+        Notificaciones
+      </div>
+
+      {!soportado && (
+        <div style={{ fontFamily: SANS, fontSize: 13, color: C.gris, lineHeight: 1.5 }}>
+          {esStandalone()
+            ? "Este dispositivo no soporta notificaciones web."
+            : "En iOS las notificaciones sólo funcionan con la app instalada. Tocá Compartir → Agregar a inicio, y abrila desde el ícono de la pantalla de inicio."}
+        </div>
+      )}
+
+      {soportado && permiso === "default" && (
+        <>
+          <div style={{ fontFamily: SANS, fontSize: 13, color: C.gris, lineHeight: 1.5, marginBottom: 14 }}>
+            Te avisamos cuando termina el descanso, aunque tengas la pantalla apagada o
+            estés en otra app. iOS te va a preguntar si permitís las notificaciones:
+            tocá <span style={{ color: C.hueso }}>Permitir</span>. Si tocás
+            "No permitir" no se puede volver a pedir desde acá.
+          </div>
+          <Boton
+            tono={pidiendo ? "neutro" : "fuerte"}
+            alto={48}
+            onClick={activar}
+            style={{ opacity: pidiendo ? 0.5 : 1 }}
+          >
+            {pidiendo ? "Esperando…" : "Activar notificaciones"}
+          </Boton>
+        </>
+      )}
+
+      {soportado && permiso === "granted" && (
+        <>
+          <div style={{ fontFamily: SANS, fontSize: 13, color: C.verde, marginBottom: 14 }}>
+            Activadas. Vas a recibir el aviso al terminar cada descanso.
+          </div>
+          <Boton tono="fantasma" alto={48} onClick={probar}>
+            Probar (llega en 5 segundos)
+          </Boton>
+          {mensajePrueba && (
+            <div
+              style={{
+                marginTop: 10,
+                fontFamily: SANS,
+                fontSize: 13,
+                lineHeight: 1.5,
+                color: prueba === "enviada" ? C.verde : C.oxido,
+              }}
+            >
+              {mensajePrueba}
+            </div>
+          )}
+        </>
+      )}
+
+      {soportado && permiso === "denied" && (
+        <div style={{ fontFamily: SANS, fontSize: 13, color: C.gris, lineHeight: 1.5 }}>
+          <div style={{ color: C.oxido, marginBottom: 8 }}>Bloqueadas.</div>
+          iOS no deja volver a pedirlas desde la app: hay que habilitarlas a mano en{" "}
+          <span style={{ color: C.hueso }}>
+            Ajustes del iPhone → Notificaciones → Gym → Permitir notificaciones
+          </span>
+          . Después volvé acá y el estado se actualiza solo.
+          <div style={{ marginTop: 8 }}>
+            No borres ni reinstales la app para resetear el permiso: se pierde todo el
+            historial guardado en el teléfono.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function VersionPanel() {
   const [estado, setEstado] = useState("idle"); // idle | buscando | al-dia | actualizando | error | sin-sw
   const cargando = estado === "buscando";
@@ -1209,6 +1357,8 @@ export function Ajustes({ dias, setDias, agregarEjercicioADia, traerHistorialDeH
           traerHistorialDeHC={traerHistorialDeHC}
           aplicarRutinaDeHC={aplicarRutinaDeHC}
         />
+
+        <NotificacionesPanel />
 
         <VersionPanel />
 

@@ -15,17 +15,15 @@ const CIRC = 2 * Math.PI * R;
 
 /* ── notificaciones ── */
 
-async function pedirPermiso() {
-  if (!("Notification" in window)) return false;
-  if (Notification.permission === "granted") return true;
-  if (Notification.permission === "denied") return false;
-  const result = await Notification.requestPermission();
-  return result === "granted";
+// Sólo consulta el permiso, nunca lo pide: Safari en iOS exige un gesto
+// directo del usuario para conceder Notification.requestPermission(), y esto
+// corre desde un useEffect. El permiso se pide desde el panel de Ajustes.
+function tienePermiso() {
+  return "Notification" in window && Notification.permission === "granted";
 }
 
 async function programarNotificacion(finTimestamp) {
-  const ok = await pedirPermiso();
-  if (!ok || !navigator.serviceWorker) return;
+  if (!tienePermiso() || !navigator.serviceWorker) return;
   try {
     const reg = await navigator.serviceWorker.ready;
     reg.active?.postMessage({

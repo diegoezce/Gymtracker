@@ -78,6 +78,15 @@ export function DiaMenu({
   const total = dia.ejercicios.filter((e) => !saltados[e.id]).length;
   const doneCount = Object.keys(hechos).length;
 
+  // Mismo criterio que huboActividad en App.jsx (salirSesion): los salteados
+  // no cuentan. Si no se registró nada, entrar al día fue sólo mirarlo, así
+  // que salir no es "terminar la sesión" y no hace falta confirmar nada.
+  const huboActividad =
+    doneCount > 0 ||
+    Object.entries(progreso).some(([id, p]) => p.series?.length > 0 && !saltados[id]);
+
+  const intentarSalir = () => (huboActividad ? setConfirmandoSalir(true) : onTerminar());
+
   if (agregando) {
     return (
       <SelectorEjercicio
@@ -103,7 +112,7 @@ export function DiaMenu({
           onCancelar={() => setConfirmandoSalir(false)}
         />
       )}
-      <Cabecera izq={`${dia.nombre} · ${doneCount}/${total}`} onSalir={() => setConfirmandoSalir(true)} />
+      <Cabecera izq={`${dia.nombre} · ${doneCount}/${total}`} onSalir={intentarSalir} />
       <div style={{ padding: "8px 20px 40px" }}>
         <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
           {dia.ejercicios.map((e, idx) => {
@@ -220,8 +229,8 @@ export function DiaMenu({
         </div>
 
         <div style={{ marginTop: 16 }}>
-          <Boton tono="fantasma" alto={54} onClick={() => setConfirmandoSalir(true)}>
-            Terminar sesión
+          <Boton tono="fantasma" alto={54} onClick={intentarSalir}>
+            {huboActividad ? "Terminar sesión" : "Volver al inicio"}
           </Boton>
         </div>
       </div>

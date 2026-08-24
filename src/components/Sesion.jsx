@@ -22,13 +22,13 @@ function tienePermiso() {
   return "Notification" in window && Notification.permission === "granted";
 }
 
-async function programarNotificacion(finTimestamp) {
+async function programarNotificacion(ejId, finTimestamp) {
   if (!tienePermiso() || !navigator.serviceWorker) return;
   try {
     const reg = await navigator.serviceWorker.ready;
     reg.active?.postMessage({
       type: "SCHEDULE_NOTIFICATION",
-      tag: "rest-timer",
+      tag: `rest-timer-${ejId}`,
       title: "¡Terminó el descanso!",
       body: "A moverse. Próxima serie lista.",
       timestamp: finTimestamp,
@@ -36,11 +36,13 @@ async function programarNotificacion(finTimestamp) {
   } catch (_) {}
 }
 
-function cancelarNotificacion() {
+async function cancelarNotificacion(ejId) {
+  if (!navigator.serviceWorker) return;
   try {
-    navigator.serviceWorker?.controller?.postMessage({
+    const reg = await navigator.serviceWorker.ready;
+    reg.active?.postMessage({
       type: "CANCEL_NOTIFICATION",
-      tag: "rest-timer",
+      tag: `rest-timer-${ejId}`,
     });
   } catch (_) {}
 }
@@ -166,17 +168,18 @@ export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarSerieT
   // Skip the timer-start effect on mount so a restored timer isn't overwritten
   const mountHandled = useRef(false);
 
-  const objetivoSeries = ej.series + (sesion.extra?.[ej.id] ?? 0);
+  const objetivoSeries = ej.tipo !== "cardio" ? ej.series + (sesion.extra?.[ej.id] ?? 0) : 0;
   const hayMasSeries = sesion.series.length > 0 && sesion.series.length < objetivoSeries;
   const esTiempo = ej.tipo === "tiempo";
   const historialPrevio = ej.historial.filter((h) => h.fecha !== hoy());
-  const ultimaSerie = !esTiempo
-    ? historialPrevio[historialPrevio.length - 1]?.series.slice(-1)[0]
-    : null;
+  const ultimaSerie =
+    ej.tipo === "fuerza"
+      ? historialPrevio[historialPrevio.length - 1]?.series.slice(-1)[0]
+      : null;
 
   // Re-schedule SW notification when mounting with a restored timer
   useEffect(() => {
-    if (timerFin) programarNotificacion(timerFin);
+    if (timerFin) programarNotificacion(ej.id, timerFin);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Start/stop timer when series count changes (skip on initial mount)
@@ -190,7 +193,7 @@ export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarSerieT
       setTimerFin(fin);
       setTimerSeg(ej.descanso);
       prevSeg.current = ej.descanso;
-      programarNotificacion(fin);
+      programarNotificacion(ej.id, fin);
     } else {
       setTimerFin(null);
       setTimerSeg(null);
@@ -221,7 +224,7 @@ export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarSerieT
   }, [timerFin]);
 
   const saltarTimer = () => {
-    cancelarNotificacion();
+    cancelarNotificacion(ej.id);
     setTimerFin(null);
     setTimerSeg(null);
     prevSeg.current = null;
@@ -340,7 +343,7 @@ export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarSerieT
 
           <div style={{ marginTop: 28, display: "flex", flexDirection: "column", gap: 8 }}>
             {sesion.series.length > 0 && (
-              <Boton tono="fuerte" alto={50} onClick={() => { cancelarNotificacion(); terminarEjercicio(); }}>
+              <Boton tono="fuerte" alto={50} onClick={() => { cancelarNotificacion(ej.id); terminarEjercicio(); }}>
                 Terminar ejercicio
               </Boton>
             )}

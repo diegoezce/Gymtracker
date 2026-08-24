@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { storage, CLAVE_RUTINA } from "./storage";
+import { storage, CLAVE_RUTINA, CLAVE_SESION } from "./storage";
 import { RUTINA_INICIAL, actualizarCompartido, vincularEjercicio, resincronizarCompartidos, agregarEntradaHistorial, editarEntradaHistorial, eliminarEntradaHistorial, fusionarEjercicios } from "./domain/rutina";
 import { leerToken, leerAutoSync, fetchSesiones, aplicarSesiones, pushSesiones, construirSesiones, fetchRutina, aplicarRutina, SYNC_KEY, TOKEN_KEY } from "./sync/hcAdapter";
 import { progresar, aprender } from "./domain/progression";
@@ -46,6 +46,10 @@ export default function App() {
           }
         }
       } catch (e) {}
+      try {
+        const s = await storage.get(CLAVE_SESION);
+        if (s?.value) setSesion(JSON.parse(s.value));
+      } catch (e) {}
       setCargando(false);
     })();
   }, []);
@@ -64,6 +68,15 @@ export default function App() {
       }
     })();
   }, [dias, cargando]);
+
+  useEffect(() => {
+    if (cargando) return;
+    (async () => {
+      try {
+        await storage.set(CLAVE_SESION, sesion === null ? "" : JSON.stringify(sesion));
+      } catch (e) {}
+    })();
+  }, [sesion, cargando]);
 
   if (cargando)
     return (

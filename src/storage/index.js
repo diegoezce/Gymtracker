@@ -5,3 +5,4 @@ import { localStorageAdapter } from "./localStorageAdapter";
 
 export const storage = localStorageAdapter;
 export const CLAVE_RUTINA = "gym:estado:v1";
+export const CLAVE_SESION = "gym:sesion:v1";

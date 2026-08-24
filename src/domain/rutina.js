@@ -108,6 +108,13 @@ export function actualizarCompartido(dias, id, cambios) {
   }));
 }
 
+// Borra el ejercicio de todo día donde aparezca (todas las copias
+// compartidas), historial incluido. A diferencia de quitarlo de un solo
+// día, esto siempre se lleva puesto el historial completo.
+export function eliminarEjercicioDeTodos(dias, id) {
+  return dias.map((d) => ({ ...d, ejercicios: d.ejercicios.filter((e) => e.id !== id) }));
+}
+
 // ── edición de historial ───────────────────────────────────────
 
 // Agrega una entrada al historial. Si ya hay una entrada para esa fecha

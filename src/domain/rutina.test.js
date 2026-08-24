@@ -4,6 +4,7 @@ import {
   ejercicioCardio,
   ejercicioTiempo,
   actualizarCompartido,
+  eliminarEjercicioDeTodos,
   vincularEjercicio,
   ejerciciosVinculables,
   resincronizarCompartidos,
@@ -42,6 +43,26 @@ describe("actualizarCompartido", () => {
     const conOtro = [dias[0], { ...dias[1], ejercicios: [otro] }];
     const actualizados = actualizarCompartido(conOtro, banca.id, { peso: 999 });
     expect(actualizados[1].ejercicios[0].peso).toBe(80);
+  });
+});
+
+describe("eliminarEjercicioDeTodos", () => {
+  it("lo borra de todos los días donde aparece, con su historial", () => {
+    const { dias, banca } = dosDias();
+    banca.historial.push({ fecha: "2026-01-01", series: [{ peso: 60, reps: 8, rir: 1 }] });
+    const vinculado = vincularEjercicio(dias, banca, "b", { series: 4 });
+    const resultado = eliminarEjercicioDeTodos(vinculado, banca.id);
+    expect(resultado[0].ejercicios).toHaveLength(0);
+    expect(resultado[1].ejercicios).toHaveLength(0);
+  });
+
+  it("no toca ejercicios con otro id", () => {
+    const { dias, banca } = dosDias();
+    const otro = ejercicio("Sentadilla", 80);
+    const conOtro = [dias[0], { ...dias[1], ejercicios: [otro] }];
+    const resultado = eliminarEjercicioDeTodos(conOtro, banca.id);
+    expect(resultado[0].ejercicios).toHaveLength(0);
+    expect(resultado[1].ejercicios).toEqual([otro]);
   });
 });
 

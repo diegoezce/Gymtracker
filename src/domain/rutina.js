@@ -70,6 +70,31 @@ export function quitarPierdeHistorial(dias, id) {
   return diasDondeAparece(dias, id).length === 1;
 }
 
+// Aproximación de "última vez" para días que todavía no tienen `ultimaSesion`
+// propio (ver más abajo) — sólo se usa como fallback de migración para
+// historial cargado antes de que existiera ese campo. Ignora los ejercicios
+// compartidos con otro día porque su historial se sincroniza sin importar
+// bajo cuál día se lo entrenó; si el día no tiene ningún ejercicio
+// exclusivo (p.ej. todos sus ejercicios están vinculados a otros días),
+// no queda otra que aproximar con el conjunto completo.
+export function ultimaFechaDia(dias, diaId) {
+  const dia = dias.find((d) => d.id === diaId);
+  if (!dia) return null;
+  const propios = dia.ejercicios.filter((e) => diasDondeAparece(dias, e.id).length === 1);
+  const fuente = propios.length > 0 ? propios : dia.ejercicios;
+  const fechas = fuente.flatMap((e) => e.historial.map((h) => h.fecha)).sort();
+  return fechas[fechas.length - 1] ?? null;
+}
+
+// Marca la fecha en la que se entrenó este día en concreto, en un campo
+// propio del día (`ultimaSesion`) — independiente del historial de sus
+// ejercicios, que puede estar compartido con otros días y por lo tanto no
+// sirve para saber cuándo se entrenó ESTE día. Se llama cada vez que se
+// guarda una serie/registro real durante una sesión (ver App.jsx).
+export function marcarSesionDia(dias, diaId, fecha) {
+  return dias.map((d) => (d.id === diaId ? { ...d, ultimaSesion: fecha } : d));
+}
+
 // ── días ────────────────────────────────────────────────────────
 
 export function crearDia(nombre) {
@@ -106,6 +131,13 @@ export function actualizarCompartido(dias, id, cambios) {
     ...d,
     ejercicios: d.ejercicios.map((e) => (e.id === id ? { ...e, ...cambios } : e)),
   }));
+}
+
+// Borra el ejercicio de todo día donde aparezca (todas las copias
+// compartidas), historial incluido. A diferencia de quitarlo de un solo
+// día, esto siempre se lleva puesto el historial completo.
+export function eliminarEjercicioDeTodos(dias, id) {
+  return dias.map((d) => ({ ...d, ejercicios: d.ejercicios.filter((e) => e.id !== id) }));
 }
 
 // ── edición de historial ───────────────────────────────────────

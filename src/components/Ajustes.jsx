@@ -11,6 +11,7 @@ import {
   diaPierdeHistorial,
   moverEjercicioOrden,
   fusionarDias,
+  eliminarEjercicioDeTodos,
 } from "../domain/rutina";
 import { Marco } from "./Marco";
 import { Cabecera } from "./Cabecera";
@@ -499,6 +500,144 @@ function TarjetaEjercicio(props) {
   if (props.ej.tipo === "cardio") return <TarjetaCardio {...props} />;
   if (props.ej.tipo === "tiempo") return <TarjetaTiempo {...props} />;
   return <TarjetaFuerza {...props} />;
+}
+
+/* ── panel administrar ejercicios ── */
+
+// Lista deduplicada por id de todo ejercicio del plan (sin importar en
+// cuántos días esté vinculado), con administración centralizada: cada
+// copia por día se edita con las mismas tarjetas que ya usa la lista de
+// días de abajo, y se agrega una acción para borrarlo de todos los días
+// a la vez (hoy sólo existe "quitar de este día" por día).
+function PanelEjercicios({ dias, editar, quitarEjercicio, moverEjercicio, moverOrden, onEliminar, onCrear }) {
+  const [expandido, setExpandido] = useState(null);
+  const [confirmandoEliminar, setConfirmandoEliminar] = useState(null);
+
+  const vistos = new Set();
+  const ejercicios = dias
+    .flatMap((d) => d.ejercicios)
+    .filter((e) => {
+      if (vistos.has(e.id)) return false;
+      vistos.add(e.id);
+      return true;
+    })
+    .sort((a, b) => a.nombre.localeCompare(b.nombre));
+
+  return (
+    <div style={{ marginTop: 36, paddingTop: 24, borderTop: `1px solid ${C.linea}` }}>
+      <div style={{ fontFamily: SANS, fontSize: 16, fontWeight: 700, color: C.hueso, marginBottom: 16 }}>
+        Ejercicios
+      </div>
+
+      {ejercicios.length === 0 ? (
+        <p style={{ fontFamily: SANS, color: C.gris, fontSize: 14, lineHeight: 1.5 }}>
+          Todavía no hay ejercicios.
+        </p>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
+          {ejercicios.map((ej) => {
+            const enDias = dias.filter((d) => d.ejercicios.some((e) => e.id === ej.id));
+            const abierto = expandido === ej.id;
+            return (
+              <div key={ej.id} style={{ background: C.sup, border: `1px solid ${C.linea}`, borderRadius: 6, overflow: "hidden" }}>
+                <button
+                  onClick={() => setExpandido(abierto ? null : ej.id)}
+                  style={{
+                    width: "100%",
+                    textAlign: "left",
+                    background: "none",
+                    border: "none",
+                    padding: "14px 16px",
+                    cursor: "pointer",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: 10,
+                    WebkitTapHighlightColor: "transparent",
+                  }}
+                >
+                  <div>
+                    <div style={{ fontFamily: SANS, fontSize: 16, fontWeight: 600, color: C.hueso }}>{ej.nombre}</div>
+                    <div style={{ fontFamily: MONO, fontSize: 12, color: C.gris, marginTop: 4 }}>
+                      {enDias.map((d) => d.nombre).join(" · ")}
+                    </div>
+                  </div>
+                  <span style={{ color: C.gris, fontFamily: "ui-monospace, monospace", fontSize: 14, flexShrink: 0 }}>
+                    {abierto ? "▲" : "▼"}
+                  </span>
+                </button>
+
+                {abierto && (
+                  <div style={{ padding: "0 12px 14px" }}>
+                    {enDias.map((d) => {
+                      const ejEnDia = d.ejercicios.find((e) => e.id === ej.id);
+                      return (
+                        <div key={d.id}>
+                          {enDias.length > 1 && (
+                            <div style={{ fontFamily: SANS, fontSize: 11, color: C.gris, textTransform: "uppercase", letterSpacing: "0.08em", margin: "10px 0 6px" }}>
+                              {d.nombre}
+                            </div>
+                          )}
+                          <TarjetaEjercicio
+                            ej={ejEnDia}
+                            diaId={d.id}
+                            dias={dias}
+                            idx={0}
+                            total={1}
+                            onEditar={editar}
+                            onQuitar={quitarEjercicio}
+                            onMover={moverEjercicio}
+                            onMoverOrden={moverOrden}
+                          />
+                        </div>
+                      );
+                    })}
+
+                    {confirmandoEliminar === ej.id ? (
+                      <div style={{ padding: "12px 14px", background: "#2a1a1a", border: `1px solid #3a2a2a`, borderRadius: 6, marginTop: 4 }}>
+                        <div style={{ fontFamily: SANS, fontSize: 13, color: C.hueso, lineHeight: 1.45 }}>
+                          Se borra de {enDias.length > 1 ? `los ${enDias.length} días donde aparece` : `"${enDias[0].nombre}"`}
+                          {ej.historial.length > 0
+                            ? `, junto con ${ej.historial.length} ${ej.historial.length === 1 ? "sesión registrada" : "sesiones registradas"}`
+                            : ""}
+                          . No se puede deshacer.
+                        </div>
+                        <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                          <button onClick={() => setConfirmandoEliminar(null)} style={CONFIRM_BTN}>
+                            Cancelar
+                          </button>
+                          <button
+                            onClick={() => { onEliminar(ej.id); setConfirmandoEliminar(null); setExpandido(null); }}
+                            style={{ ...CONFIRM_BTN, color: "#c0392b", borderColor: "#3a2a2a" }}
+                          >
+                            Eliminar igual
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmandoEliminar(ej.id)}
+                        style={{ width: "100%", marginTop: 4, background: "none", border: `1px solid #3a2a2a`, borderRadius: 4, color: "#c0392b", fontFamily: SANS, fontSize: 13, padding: "10px 0", cursor: "pointer" }}
+                      >
+                        Eliminar ejercicio{enDias.length > 1 ? " de todos los días" : ""}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <button
+        onClick={onCrear}
+        style={{ width: "100%", background: "none", border: `1px dashed ${C.sodio}`, borderRadius: 6, color: C.sodio, fontFamily: SANS, fontSize: 15, fontWeight: 600, padding: "15px 0", cursor: "pointer" }}
+      >
+        + Crear ejercicio
+      </button>
+    </div>
+  );
 }
 
 /* ── panel compartir rutina ── */
@@ -1158,6 +1297,7 @@ export function Ajustes({ dias, setDias, agregarEjercicioADia, traerHistorialDeH
   const [agregandoEnDia, setAgregandoEnDia] = useState(null);
   const [confirmandoQuitarDia, setConfirmandoQuitarDia] = useState(null);
   const [fusionandoDia, setFusionandoDia] = useState(null);
+  const [creandoEjercicio, setCreandoEjercicio] = useState(false);
   // Colapsado por default (la lista de días se hace larga); un día recién
   // creado se abre solo, para poder cargarle ejercicios sin un tap extra.
   const [colapsados, setColapsados] = useState({});
@@ -1178,6 +1318,8 @@ export function Ajustes({ dias, setDias, agregarEjercicioADia, traerHistorialDeH
     setDias(dias.map((d) =>
       d.id !== diaId ? d : { ...d, ejercicios: d.ejercicios.filter((e) => e.id !== ejId) }
     ));
+
+  const eliminarEjercicioCompleto = (ejId) => setDias(eliminarEjercicioDeTodos(dias, ejId));
 
   const moverEjercicio = (diaOrigenId, ejId, diaDestinoId) => {
     const ej = dias.find((d) => d.id === diaOrigenId)?.ejercicios.find((e) => e.id === ejId);
@@ -1237,6 +1379,33 @@ export function Ajustes({ dias, setDias, agregarEjercicioADia, traerHistorialDeH
         }}
         volver={() => setAgregandoEnDia(null)}
       />
+    );
+  }
+
+  if (creandoEjercicio) {
+    return (
+      <Marco>
+        <Cabecera izq="¿A qué día lo agregás?" onSalir={() => setCreandoEjercicio(false)} />
+        <div style={{ padding: "8px 20px 40px" }}>
+          <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 8 }}>
+            {dias.map((d) => (
+              <button
+                key={d.id}
+                onClick={() => { setCreandoEjercicio(false); setAgregandoEnDia(d.id); }}
+                style={{ width: "100%", textAlign: "left", background: C.sup, border: `1px solid ${C.linea}`, borderRadius: 6, padding: "14px 16px", cursor: "pointer", WebkitTapHighlightColor: "transparent" }}
+              >
+                <div style={{ fontFamily: SANS, fontSize: 16, fontWeight: 600, color: C.hueso }}>{d.nombre}</div>
+                <div style={{ fontFamily: MONO, fontSize: 12, color: C.gris, marginTop: 4 }}>
+                  {d.ejercicios.length} ejercicio{d.ejercicios.length !== 1 ? "s" : ""}
+                </div>
+              </button>
+            ))}
+          </div>
+          <div style={{ marginTop: 20 }}>
+            <Boton tono="fantasma" alto={54} onClick={() => setCreandoEjercicio(false)}>Cancelar</Boton>
+          </div>
+        </div>
+      </Marco>
     );
   }
 
@@ -1349,6 +1518,16 @@ export function Ajustes({ dias, setDias, agregarEjercicioADia, traerHistorialDeH
         >
           + Agregar día
         </button>
+
+        <PanelEjercicios
+          dias={dias}
+          editar={editar}
+          quitarEjercicio={quitarEjercicio}
+          moverEjercicio={moverEjercicio}
+          moverOrden={moverOrden}
+          onEliminar={eliminarEjercicioCompleto}
+          onCrear={() => setCreandoEjercicio(true)}
+        />
 
         <PanelCompartir dias={dias} onImportar={onImportarRutina} />
 

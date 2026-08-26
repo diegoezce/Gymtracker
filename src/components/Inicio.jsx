@@ -1,5 +1,6 @@
 import { C, MONO, SANS } from "../theme";
 import { fmt, fechaCorta } from "../utils/format";
+import { ultimaFechaDia } from "../domain/rutina";
 import { Marco } from "./Marco";
 import { Etiqueta } from "./Etiqueta";
 import { Boton } from "./Boton";
@@ -43,10 +44,7 @@ export function Inicio({ dias, aviso, comenzar, irHistorial, irAjustes }) {
 
         <div style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 12 }}>
           {dias.map((d) => {
-            const ultima = d.ejercicios
-              .flatMap((e) => e.historial.map((h) => h.fecha))
-              .sort()
-              .slice(-1)[0];
+            const ultima = d.ultimaSesion ?? ultimaFechaDia(dias, d.id);
             return (
               <button
                 key={d.id}

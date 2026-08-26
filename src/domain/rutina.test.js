@@ -4,11 +4,14 @@ import {
   ejercicioCardio,
   ejercicioTiempo,
   actualizarCompartido,
+  eliminarEjercicioDeTodos,
   vincularEjercicio,
   ejerciciosVinculables,
   resincronizarCompartidos,
   diasDondeAparece,
   quitarPierdeHistorial,
+  ultimaFechaDia,
+  marcarSesionDia,
   crearDia,
   diaPierdeHistorial,
   moverEjercicioOrden,
@@ -42,6 +45,26 @@ describe("actualizarCompartido", () => {
     const conOtro = [dias[0], { ...dias[1], ejercicios: [otro] }];
     const actualizados = actualizarCompartido(conOtro, banca.id, { peso: 999 });
     expect(actualizados[1].ejercicios[0].peso).toBe(80);
+  });
+});
+
+describe("eliminarEjercicioDeTodos", () => {
+  it("lo borra de todos los días donde aparece, con su historial", () => {
+    const { dias, banca } = dosDias();
+    banca.historial.push({ fecha: "2026-01-01", series: [{ peso: 60, reps: 8, rir: 1 }] });
+    const vinculado = vincularEjercicio(dias, banca, "b", { series: 4 });
+    const resultado = eliminarEjercicioDeTodos(vinculado, banca.id);
+    expect(resultado[0].ejercicios).toHaveLength(0);
+    expect(resultado[1].ejercicios).toHaveLength(0);
+  });
+
+  it("no toca ejercicios con otro id", () => {
+    const { dias, banca } = dosDias();
+    const otro = ejercicio("Sentadilla", 80);
+    const conOtro = [dias[0], { ...dias[1], ejercicios: [otro] }];
+    const resultado = eliminarEjercicioDeTodos(conOtro, banca.id);
+    expect(resultado[0].ejercicios).toHaveLength(0);
+    expect(resultado[1].ejercicios).toEqual([otro]);
   });
 });
 
@@ -257,6 +280,50 @@ describe("quitarPierdeHistorial", () => {
       { id: "b", nombre: "Día B", ejercicios: [] },
     ];
     expect(quitarPierdeHistorial(dias, banca.id)).toBe(true);
+  });
+});
+
+describe("ultimaFechaDia", () => {
+  it("ignora la fecha de un ejercicio compartido con otro día, aunque sea más reciente", () => {
+    const propioA = { ...ejercicio("Press banca", 60), historial: [{ fecha: "2026-08-01", series: [{ peso: 60, reps: 8, rir: 1 }] }] };
+    const propioB = { ...ejercicio("Sentadilla", 80), historial: [{ fecha: "2026-08-10", series: [{ peso: 80, reps: 8, rir: 1 }] }] };
+    const compartido = { ...ejercicio("Cardio", 0), id: "cardio1", historial: [{ fecha: "2026-08-01", series: [] }, { fecha: "2026-08-10", series: [] }] };
+    const dias = [
+      { id: "a", nombre: "Día A", ejercicios: [propioA, compartido] },
+      { id: "b", nombre: "Día B", ejercicios: [propioB, compartido] },
+    ];
+    expect(ultimaFechaDia(dias, "a")).toBe("2026-08-01");
+    expect(ultimaFechaDia(dias, "b")).toBe("2026-08-10");
+  });
+
+  it("si no hay ningún ejercicio exclusivo, aproxima con el conjunto completo", () => {
+    const compartido = { ...ejercicio("Cardio", 0), id: "cardio1", historial: [{ fecha: "2026-08-05", series: [] }] };
+    const dias = [
+      { id: "a", nombre: "Día A", ejercicios: [compartido] },
+      { id: "b", nombre: "Día B", ejercicios: [compartido] },
+    ];
+    expect(ultimaFechaDia(dias, "a")).toBe("2026-08-05");
+  });
+
+  it("devuelve null si el día no tiene historial", () => {
+    const { dias } = dosDias();
+    expect(ultimaFechaDia(dias, "a")).toBe(null);
+  });
+});
+
+describe("marcarSesionDia", () => {
+  it("marca ultimaSesion sólo en el día indicado", () => {
+    const { dias } = dosDias();
+    const marcados = marcarSesionDia(dias, "a", "2026-08-26");
+    expect(marcados[0].ultimaSesion).toBe("2026-08-26");
+    expect(marcados[1].ultimaSesion).toBeUndefined();
+  });
+
+  it("sobrescribe una marca previa con la fecha nueva", () => {
+    const { dias } = dosDias();
+    const primera = marcarSesionDia(dias, "a", "2026-08-01");
+    const segunda = marcarSesionDia(primera, "a", "2026-08-26");
+    expect(segunda[0].ultimaSesion).toBe("2026-08-26");
   });
 });
 

@@ -70,6 +70,20 @@ export function quitarPierdeHistorial(dias, id) {
   return diasDondeAparece(dias, id).length === 1;
 }
 
+// Última fecha de historial entre los ejercicios NO compartidos con otro
+// día — un ejercicio vinculado a varios días no dice nada sobre cuándo se
+// entrenó ESTE día, porque su historial se sincroniza sin importar bajo
+// cuál día se lo entrenó. Si el día no tiene ningún ejercicio exclusivo,
+// no queda otra que aproximar con el conjunto completo.
+export function ultimaFechaDia(dias, diaId) {
+  const dia = dias.find((d) => d.id === diaId);
+  if (!dia) return null;
+  const propios = dia.ejercicios.filter((e) => diasDondeAparece(dias, e.id).length === 1);
+  const fuente = propios.length > 0 ? propios : dia.ejercicios;
+  const fechas = fuente.flatMap((e) => e.historial.map((h) => h.fecha)).sort();
+  return fechas[fechas.length - 1] ?? null;
+}
+
 // ── días ────────────────────────────────────────────────────────
 
 export function crearDia(nombre) {

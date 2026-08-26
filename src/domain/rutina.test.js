@@ -10,6 +10,7 @@ import {
   resincronizarCompartidos,
   diasDondeAparece,
   quitarPierdeHistorial,
+  ultimaFechaDia,
   crearDia,
   diaPierdeHistorial,
   moverEjercicioOrden,
@@ -278,6 +279,34 @@ describe("quitarPierdeHistorial", () => {
       { id: "b", nombre: "Día B", ejercicios: [] },
     ];
     expect(quitarPierdeHistorial(dias, banca.id)).toBe(true);
+  });
+});
+
+describe("ultimaFechaDia", () => {
+  it("ignora la fecha de un ejercicio compartido con otro día, aunque sea más reciente", () => {
+    const propioA = { ...ejercicio("Press banca", 60), historial: [{ fecha: "2026-08-01", series: [{ peso: 60, reps: 8, rir: 1 }] }] };
+    const propioB = { ...ejercicio("Sentadilla", 80), historial: [{ fecha: "2026-08-10", series: [{ peso: 80, reps: 8, rir: 1 }] }] };
+    const compartido = { ...ejercicio("Cardio", 0), id: "cardio1", historial: [{ fecha: "2026-08-01", series: [] }, { fecha: "2026-08-10", series: [] }] };
+    const dias = [
+      { id: "a", nombre: "Día A", ejercicios: [propioA, compartido] },
+      { id: "b", nombre: "Día B", ejercicios: [propioB, compartido] },
+    ];
+    expect(ultimaFechaDia(dias, "a")).toBe("2026-08-01");
+    expect(ultimaFechaDia(dias, "b")).toBe("2026-08-10");
+  });
+
+  it("si no hay ningún ejercicio exclusivo, aproxima con el conjunto completo", () => {
+    const compartido = { ...ejercicio("Cardio", 0), id: "cardio1", historial: [{ fecha: "2026-08-05", series: [] }] };
+    const dias = [
+      { id: "a", nombre: "Día A", ejercicios: [compartido] },
+      { id: "b", nombre: "Día B", ejercicios: [compartido] },
+    ];
+    expect(ultimaFechaDia(dias, "a")).toBe("2026-08-05");
+  });
+
+  it("devuelve null si el día no tiene historial", () => {
+    const { dias } = dosDias();
+    expect(ultimaFechaDia(dias, "a")).toBe(null);
   });
 });
 

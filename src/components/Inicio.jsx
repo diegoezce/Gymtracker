@@ -44,7 +44,7 @@ export function Inicio({ dias, aviso, comenzar, irHistorial, irAjustes }) {
 
         <div style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 12 }}>
           {dias.map((d) => {
-            const ultima = ultimaFechaDia(dias, d.id);
+            const ultima = d.ultimaSesion ?? ultimaFechaDia(dias, d.id);
             return (
               <button
                 key={d.id}

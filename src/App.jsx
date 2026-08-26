@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { storage, CLAVE_RUTINA, CLAVE_SESION } from "./storage";
-import { RUTINA_INICIAL, actualizarCompartido, vincularEjercicio, resincronizarCompartidos, agregarEntradaHistorial, editarEntradaHistorial, eliminarEntradaHistorial, fusionarEjercicios } from "./domain/rutina";
+import { RUTINA_INICIAL, actualizarCompartido, vincularEjercicio, resincronizarCompartidos, agregarEntradaHistorial, editarEntradaHistorial, eliminarEntradaHistorial, fusionarEjercicios, marcarSesionDia } from "./domain/rutina";
 import { leerToken, leerAutoSync, fetchSesiones, aplicarSesiones, pushSesiones, construirSesiones, fetchRutina, aplicarRutina, SYNC_KEY, TOKEN_KEY } from "./sync/hcAdapter";
 import { progresar, aprender } from "./domain/progression";
 import { hoy } from "./utils/format";
@@ -123,9 +123,10 @@ export default function App() {
   };
 
   const guardarCardio = (duracion, distancia) => {
-    const nuevos = actualizarCompartido(dias, ej.id, {
+    let nuevos = actualizarCompartido(dias, ej.id, {
       historial: agregarEntradaHistorial(ej.historial, { fecha: hoy(), duracion, distancia }),
     });
+    nuevos = marcarSesionDia(nuevos, dia.id, hoy());
     setDias(nuevos);
     syncSilencioso(nuevos);
     setSesion({ ...sesion, ejIdx: null, series: [], hechos: { ...sesion.hechos, [ej.id]: true } });
@@ -151,13 +152,14 @@ export default function App() {
   const cerrarEjercicio = (series) => {
     const { peso, repsObjetivo, nota } = progresar(ej, series);
     const { ajustes, incremento, aviso: av } = aprender(ej, series[0].peso);
-    const nuevos = actualizarCompartido(dias, ej.id, {
+    let nuevos = actualizarCompartido(dias, ej.id, {
       peso,
       repsObjetivo,
       incremento,
       ajustes,
       historial: agregarEntradaHistorial(ej.historial, { fecha: hoy(), series }),
     });
+    nuevos = marcarSesionDia(nuevos, dia.id, hoy());
     setDias(nuevos);
     setAviso(av || nota);
     syncSilencioso(nuevos);
@@ -176,10 +178,11 @@ export default function App() {
 
   const cerrarEjercicioTiempo = (series) => {
     const { duracionObjetivo, nota } = progresar(ej, series);
-    const nuevos = actualizarCompartido(dias, ej.id, {
+    let nuevos = actualizarCompartido(dias, ej.id, {
       duracionObjetivo,
       historial: agregarEntradaHistorial(ej.historial, { fecha: hoy(), series }),
     });
+    nuevos = marcarSesionDia(nuevos, dia.id, hoy());
     setDias(nuevos);
     setAviso(nota);
     syncSilencioso(nuevos);
@@ -221,6 +224,7 @@ export default function App() {
           historial: agregarEntradaHistorial(actual.historial, { fecha: hoy(), series: p.series }),
         });
       });
+      nuevos = marcarSesionDia(nuevos, dia.id, hoy());
       setDias(nuevos);
     }
 

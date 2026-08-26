@@ -70,10 +70,12 @@ export function quitarPierdeHistorial(dias, id) {
   return diasDondeAparece(dias, id).length === 1;
 }
 
-// Última fecha de historial entre los ejercicios NO compartidos con otro
-// día — un ejercicio vinculado a varios días no dice nada sobre cuándo se
-// entrenó ESTE día, porque su historial se sincroniza sin importar bajo
-// cuál día se lo entrenó. Si el día no tiene ningún ejercicio exclusivo,
+// Aproximación de "última vez" para días que todavía no tienen `ultimaSesion`
+// propio (ver más abajo) — sólo se usa como fallback de migración para
+// historial cargado antes de que existiera ese campo. Ignora los ejercicios
+// compartidos con otro día porque su historial se sincroniza sin importar
+// bajo cuál día se lo entrenó; si el día no tiene ningún ejercicio
+// exclusivo (p.ej. todos sus ejercicios están vinculados a otros días),
 // no queda otra que aproximar con el conjunto completo.
 export function ultimaFechaDia(dias, diaId) {
   const dia = dias.find((d) => d.id === diaId);
@@ -82,6 +84,15 @@ export function ultimaFechaDia(dias, diaId) {
   const fuente = propios.length > 0 ? propios : dia.ejercicios;
   const fechas = fuente.flatMap((e) => e.historial.map((h) => h.fecha)).sort();
   return fechas[fechas.length - 1] ?? null;
+}
+
+// Marca la fecha en la que se entrenó este día en concreto, en un campo
+// propio del día (`ultimaSesion`) — independiente del historial de sus
+// ejercicios, que puede estar compartido con otros días y por lo tanto no
+// sirve para saber cuándo se entrenó ESTE día. Se llama cada vez que se
+// guarda una serie/registro real durante una sesión (ver App.jsx).
+export function marcarSesionDia(dias, diaId, fecha) {
+  return dias.map((d) => (d.id === diaId ? { ...d, ultimaSesion: fecha } : d));
 }
 
 // ── días ────────────────────────────────────────────────────────

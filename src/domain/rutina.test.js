@@ -11,6 +11,7 @@ import {
   diasDondeAparece,
   quitarPierdeHistorial,
   ultimaFechaDia,
+  marcarSesionDia,
   crearDia,
   diaPierdeHistorial,
   moverEjercicioOrden,
@@ -307,6 +308,22 @@ describe("ultimaFechaDia", () => {
   it("devuelve null si el día no tiene historial", () => {
     const { dias } = dosDias();
     expect(ultimaFechaDia(dias, "a")).toBe(null);
+  });
+});
+
+describe("marcarSesionDia", () => {
+  it("marca ultimaSesion sólo en el día indicado", () => {
+    const { dias } = dosDias();
+    const marcados = marcarSesionDia(dias, "a", "2026-08-26");
+    expect(marcados[0].ultimaSesion).toBe("2026-08-26");
+    expect(marcados[1].ultimaSesion).toBeUndefined();
+  });
+
+  it("sobrescribe una marca previa con la fecha nueva", () => {
+    const { dias } = dosDias();
+    const primera = marcarSesionDia(dias, "a", "2026-08-01");
+    const segunda = marcarSesionDia(primera, "a", "2026-08-26");
+    expect(segunda[0].ultimaSesion).toBe("2026-08-26");
   });
 });
 

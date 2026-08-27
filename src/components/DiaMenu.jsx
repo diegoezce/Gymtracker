@@ -24,7 +24,7 @@ const ACCION_BTN = {
   WebkitTapHighlightColor: "transparent",
 };
 
-function ConfirmarTerminarSesion({ onConfirmar, onCancelar }) {
+function ConfirmarTerminarSesion({ onConfirmar, onPausar, onCancelar }) {
   return (
     <div
       onClick={onCancelar}
@@ -51,10 +51,11 @@ function ConfirmarTerminarSesion({ onConfirmar, onCancelar }) {
           ¿Terminar la sesión?
         </div>
         <div style={{ fontFamily: SANS, fontSize: 14, color: C.gris, textAlign: "center", marginBottom: 22, lineHeight: 1.4 }}>
-          Lo que ya registraste queda guardado.
+          Lo que ya registraste queda guardado en cualquier caso.
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <Boton tono="fuerte" alto={54} onClick={onConfirmar}>Sí, terminar sesión</Boton>
+          <Boton tono="neutro" alto={50} onClick={onPausar}>Salir sin terminar</Boton>
           <Boton tono="fantasma" alto={48} onClick={onCancelar}>Cancelar</Boton>
         </div>
       </div>
@@ -71,6 +72,7 @@ export function DiaMenu({
   onEjercicio,
   onAlternarSaltado,
   onTerminar,
+  onPausar,
   onAgregarEjercicio,
 }) {
   const [agregando, setAgregando] = useState(false);
@@ -109,6 +111,7 @@ export function DiaMenu({
       {confirmandoSalir && (
         <ConfirmarTerminarSesion
           onConfirmar={onTerminar}
+          onPausar={onPausar}
           onCancelar={() => setConfirmandoSalir(false)}
         />
       )}

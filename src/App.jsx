@@ -18,6 +18,7 @@ export default function App() {
   const [dias, setDias] = useState(RUTINA_INICIAL);
   const [pantalla, setPantalla] = useState("inicio");
   const [sesion, setSesion] = useState(null);
+  const [sesionPausada, setSesionPausada] = useState(false);
   const [aviso, setAviso] = useState("");
   const [preguntaSync, setPreguntaSync] = useState(null);
   const primeraCarga = useRef(true);
@@ -105,8 +106,18 @@ export default function App() {
 
   const comenzar = (dia) => {
     setAviso("");
+    setSesionPausada(false);
     setSesion({ diaId: dia.id, ejIdx: null, pesoActual: 0, series: [], hechos: {}, progreso: {}, saltados: {}, extra: {} });
   };
+
+  // Pausar: vuelve a Inicio sin tocar la sesión — queda intacta (en memoria
+  // y persistida) para retomarla. No escribe nada en `dias`/historial.
+  const pausarSesion = () => setSesionPausada(true);
+  const reanudarSesion = () => setSesionPausada(false);
+
+  // Empezar un día distinto al que está en pausa descarta lo no guardado de
+  // ese otro (nunca llegó a `dias`, sólo vivía en `sesion.progreso`).
+  const descartarYEmpezar = (diaNuevo) => comenzar(diaNuevo);
 
   const dia = sesion ? dias.find((d) => d.id === sesion.diaId) : null;
   const ej = dia && sesion.ejIdx !== null ? dia.ejercicios[sesion.ejIdx] : null;
@@ -314,7 +325,7 @@ export default function App() {
     return <ConfirmarSync onSincronizar={confirmarSyncYSalir} onSalirSinSincronizar={salirSinSincronizar} />;
   }
 
-  if (sesion && !ej) {
+  if (sesion && !sesionPausada && !ej) {
     return (
       <DiaMenu
         dia={dia}
@@ -325,12 +336,13 @@ export default function App() {
         onEjercicio={iniciarEjercicio}
         onAlternarSaltado={alternarSaltado}
         onTerminar={salirSesion}
+        onPausar={pausarSesion}
         onAgregarEjercicio={(ejFuente, configDia) => agregarEjercicioADia(dia.id, ejFuente, configDia)}
       />
     );
   }
 
-  if (sesion && ej) {
+  if (sesion && !sesionPausada && ej) {
     return (
       <Sesion
         dia={dia}
@@ -378,7 +390,11 @@ export default function App() {
     <Inicio
       dias={dias}
       aviso={aviso}
+      sesion={sesion}
+      sesionPausada={sesionPausada}
       comenzar={comenzar}
+      onReanudar={reanudarSesion}
+      onDescartarYEmpezar={descartarYEmpezar}
       irHistorial={() => setPantalla("historial")}
       irAjustes={() => setPantalla("ajustes")}
     />

@@ -245,6 +245,7 @@ export function Progreso({ dias, volver, onEditarHistorial, onEliminarHistorial,
           }));
           const pr = Math.max(...pesoData.map((d) => d.valor));
           const prFecha = pesoData.find((d) => d.valor === pr)?.fecha;
+          const ultima = e.historial[e.historial.length - 1];
           const volUltima = volData[volData.length - 1]?.valor ?? 0;
 
           return (
@@ -254,6 +255,7 @@ export function Progreso({ dias, volver, onEditarHistorial, onEliminarHistorial,
                 <span style={{ color: C.sodio, fontWeight: 700 }}>PR {fmt(pr)} kg</span>
                 {prFecha && <span> · {fechaCorta(prFecha)}</span>}
                 <span> · {e.historial.length} sesión{e.historial.length !== 1 ? "es" : ""}</span>
+                {ultima && <span> · última {fechaCorta(ultima.fecha)}</span>}
               </div>
 
               <Etiqueta>Peso máximo (kg)</Etiqueta>

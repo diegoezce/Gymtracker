@@ -90,6 +90,54 @@ describe("aplicarSesiones con tipo tiempo", () => {
   });
 });
 
+describe("aplicarSesiones preserva historial local no presente en HC", () => {
+  it("no borra el historial local de un ejercicio ausente en HC", () => {
+    const dias = [
+      {
+        id: "a",
+        nombre: "Día A",
+        ejercicios: [
+          {
+            id: "elev1",
+            tipo: "fuerza",
+            nombre: "Elevaciones laterales",
+            peso: 6,
+            historial: [{ fecha: "2026-08-01", series: [{ peso: 6, reps: 12, rir: 1 }] }],
+          },
+        ],
+      },
+    ];
+    // HC no tiene ninguna sesión de este ejercicio
+    const resultado = aplicarSesiones(dias, []);
+    expect(resultado[0].ejercicios[0].historial).toHaveLength(1);
+    expect(resultado[0].ejercicios[0].historial[0].fecha).toBe("2026-08-01");
+  });
+
+  it("fusiona historial local con el de HC uniendo por fecha", () => {
+    const dias = [
+      {
+        id: "a",
+        nombre: "Día A",
+        ejercicios: [
+          {
+            id: "elev1",
+            tipo: "fuerza",
+            nombre: "Elevaciones laterales",
+            peso: 6,
+            historial: [{ fecha: "2026-08-01", series: [{ peso: 6, reps: 12, rir: 1 }] }],
+          },
+        ],
+      },
+    ];
+    const sesiones = [
+      { fecha: "2026-08-08", dia: "Día A", ejercicios: [{ nombre: "Elevaciones laterales", series: [{ peso: 8, reps: 12, rir: 0 }] }] },
+    ];
+    const resultado = aplicarSesiones(dias, sesiones);
+    const fechas = resultado[0].ejercicios[0].historial.map((h) => h.fecha);
+    expect(fechas).toEqual(["2026-08-01", "2026-08-08"]);
+  });
+});
+
 describe("aplicarSesiones con ejercicio compartido entre días", () => {
   // Reproduce el caso real: por el bug de construirSesiones (ya corregido),
   // TODAS las sesiones históricas en HC quedaron etiquetadas "Día C", aunque

@@ -60,23 +60,31 @@ export function aplicarSesiones(dias, sesiones) {
       // mismo historial sin importar bajo cuál día se entrenaron.
       const esCompartido = diasDondeAparece(dias, ej.id).length > 1;
       const sesionesDelDia = esCompartido ? sesiones : sesiones.filter((s) => s.dia === dia.nombre);
-      if (ej.tipo === "cardio") {
-        const historial = sesionesDelDia
-          .flatMap((s) => {
-            const ejHC = s.ejercicios.find((e) => e.nombre === ej.nombre);
-            return ejHC ? [{ fecha: s.fecha, duracion: ejHC.duracion, distancia: ejHC.distancia }] : [];
-          })
-          .sort((a, b) => a.fecha.localeCompare(b.fecha))
-          .slice(-40);
-        return { ...ej, historial };
-      }
-      const historial = sesionesDelDia
-        .flatMap((s) => {
-          const ejHC = s.ejercicios.find((e) => e.nombre === ej.nombre);
-          return ejHC ? [{ fecha: s.fecha, series: ejHC.series }] : [];
-        })
+
+      // Entradas que HC tiene para este ejercicio (match por nombre)
+      const desdeHC = sesionesDelDia.flatMap((s) => {
+        const ejHC = s.ejercicios.find((e) => e.nombre === ej.nombre);
+        if (!ejHC) return [];
+        return [
+          ej.tipo === "cardio"
+            ? { fecha: s.fecha, duracion: ejHC.duracion, distancia: ejHC.distancia }
+            : { fecha: s.fecha, series: ejHC.series },
+        ];
+      });
+
+      // FUSIONA con el historial local en vez de reemplazarlo: así no se
+      // pierde el historial de ejercicios que nunca llegaron a HC (p.ej.
+      // sesiones hechas con auto-sync apagado). Ante la misma fecha gana HC.
+      const porFecha = new Map();
+      (ej.historial ?? []).forEach((h) => porFecha.set(h.fecha, h));
+      desdeHC.forEach((h) => porFecha.set(h.fecha, h));
+      const historial = [...porFecha.values()]
         .sort((a, b) => a.fecha.localeCompare(b.fecha))
         .slice(-40);
+
+      if (ej.tipo === "cardio") {
+        return { ...ej, historial };
+      }
       const ultimaSerie = historial[historial.length - 1]?.series;
       if (ej.tipo === "tiempo") {
         const ultimoObjetivo =

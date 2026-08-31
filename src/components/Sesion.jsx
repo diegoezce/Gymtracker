@@ -172,9 +172,13 @@ export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarSerieT
   const hayMasSeries = sesion.series.length > 0 && sesion.series.length < objetivoSeries;
   const esTiempo = ej.tipo === "tiempo";
   const historialPrevio = ej.historial.filter((h) => h.fecha !== hoy());
-  // Busca desde el final la sesión más reciente con datos reales
+  // Busca desde el final la sesión más reciente con datos reales. Se trata
+  // como fuerza todo lo que no sea cardio ni tiempo: los datos viejos (o los
+  // restaurados desde HC) pueden tener `tipo` undefined en vez de "fuerza",
+  // y con un guard `=== "fuerza"` esos ejercicios mostraban "sin registro
+  // previo" aunque tuvieran historial cargado.
   const ultimaSesion =
-    ej.tipo === "fuerza"
+    !esTiempo && ej.tipo !== "cardio"
       ? [...historialPrevio].reverse().find((h) => h.series?.length > 0)
       : null;
 

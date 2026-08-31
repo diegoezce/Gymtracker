@@ -172,13 +172,10 @@ export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarSerieT
   const hayMasSeries = sesion.series.length > 0 && sesion.series.length < objetivoSeries;
   const esTiempo = ej.tipo === "tiempo";
   const historialPrevio = ej.historial.filter((h) => h.fecha !== hoy());
-  // Busca desde el final: la entrada más reciente puede no tener series
-  // cargadas (p.ej. un registro corregido a mano en Progreso quedó con el
-  // array vacío), y en ese caso hay que mirar la anterior en vez de asumir
-  // que la última siempre trae datos.
-  const ultimaSerie =
+  // Busca desde el final la sesión más reciente con datos reales
+  const ultimaSesion =
     ej.tipo === "fuerza"
-      ? [...historialPrevio].reverse().find((h) => h.series?.length > 0)?.series.slice(-1)[0]
+      ? [...historialPrevio].reverse().find((h) => h.series?.length > 0)
       : null;
 
   // Re-schedule SW notification when mounting with a restored timer
@@ -305,10 +302,24 @@ export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarSerieT
           </button>
 
           {!esTiempo && (
-            <div style={{ marginTop: 6, fontFamily: MONO, fontSize: 12, color: C.gris, opacity: 0.75 }}>
-              {ultimaSerie
-                ? `Última vez: ${fmt(ultimaSerie.peso)} kg × ${ultimaSerie.reps} reps${ultimaSerie.rir === 0 ? " · al fallo" : ""}`
-                : "No hay registro previo."}
+            <div style={{ marginTop: 8, padding: "10px 12px", background: C.sup, border: `1px solid ${C.linea}`, borderRadius: 4 }}>
+              {ultimaSesion ? (
+                <>
+                  <div style={{ fontFamily: SANS, fontSize: 11, color: C.gris, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>
+                    Última sesión · {ultimaSesion.fecha}
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                    {ultimaSesion.series.map((s, i) => (
+                      <div key={i} style={{ fontFamily: MONO, fontSize: 14, color: C.hueso }}>
+                        <span style={{ color: C.gris, marginRight: 8 }}>{i + 1}</span>
+                        {fmt(s.peso)} kg × {s.reps} reps{s.rir === 0 ? " · fallo" : ""}
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div style={{ fontFamily: MONO, fontSize: 12, color: C.gris }}>Sin registro previo</div>
+              )}
             </div>
           )}
 

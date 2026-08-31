@@ -363,6 +363,39 @@ describe("resincronizarCompartidos", () => {
     expect(resultado[1].ejercicios[0].peso).toBe(65);
   });
 
+  it("repara una copia que quedó con el historial vacío", () => {
+    // Caso real: por el bug de aplicarSesiones, la copia de un día se
+    // reconstruyó sin nada mientras la del otro se quedó con todo.
+    const { dias, banca } = dosDias();
+    let compartido = vincularEjercicio(dias, banca, "b");
+    compartido = compartido.map((d, i) => ({
+      ...d,
+      ejercicios: d.ejercicios.map((e) => ({
+        ...e,
+        historial: i === 0 ? [] : [{ fecha: "2026-08-31", series: [{ peso: 86, reps: 12, rir: 1 }] }],
+      })),
+    }));
+
+    const resultado = resincronizarCompartidos(compartido);
+    expect(resultado[0].ejercicios[0].historial).toHaveLength(1);
+    expect(resultado[0].ejercicios[0].historial).toEqual(resultado[1].ejercicios[0].historial);
+  });
+
+  it("es idempotente: correrlo sobre datos ya sincronizados no cambia nada", () => {
+    const { dias, banca } = dosDias();
+    let compartido = vincularEjercicio(dias, banca, "b");
+    compartido = compartido.map((d) => ({
+      ...d,
+      ejercicios: d.ejercicios.map((e) => ({
+        ...e,
+        historial: [{ fecha: "2026-08-31", series: [{ peso: 86, reps: 12, rir: 1 }] }],
+      })),
+    }));
+
+    const unaVez = resincronizarCompartidos(compartido);
+    expect(resincronizarCompartidos(unaVez)).toEqual(unaVez);
+  });
+
   it("no dedupea de más ni toca ejercicios sin compartir", () => {
     const banca = ejercicio("Press banca", 60);
     const sentadilla = ejercicio("Sentadilla", 80);

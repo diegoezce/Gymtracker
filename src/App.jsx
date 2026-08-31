@@ -27,17 +27,21 @@ export default function App() {
     (async () => {
       try {
         const r = await storage.get(CLAVE_RUTINA);
+        let diasLocales = null;
         if (r?.value) {
           // Resincroniza al abrir: si dos copias del mismo ejercicio (mismo id
           // en días distintos) quedaron con historiales distintos, se unen acá.
-          // Sin esto una desincronización queda congelada para siempre — el
-          // historial local nunca se vuelve a reconciliar solo, y el ejercicio
-          // aparece "sin registro previo" desde el día cuya copia quedó vacía.
-          setDias(resincronizarCompartidos(JSON.parse(r.value)));
-        } else {
-          // Sin datos locales: restaurar rutina + historial desde HC
-          const token = leerToken();
-          if (token) {
+          diasLocales = resincronizarCompartidos(JSON.parse(r.value));
+          setDias(diasLocales);
+        }
+
+        // Restaurar desde HC si: no hay datos locales, O si los hay pero todos
+        // los ejercicios tienen historial vacío (datos corruptos / borrados).
+        const token = leerToken();
+        if (token) {
+          const sinHistorial = !diasLocales ||
+            diasLocales.every((d) => d.ejercicios.every((e) => !e.historial?.length));
+          if (sinHistorial) {
             try {
               const [{ rutina }, { sesiones }] = await Promise.all([
                 fetchRutina(token),

@@ -145,12 +145,10 @@ export function aplicarRutina(rutinaHC, diasLocales) {
 // tiempo real de sesión, así que esto es sólo una aproximación razonable.
 const SEGUNDOS_ACTIVOS_POR_SERIE = 45;
 
-// A qué día(s) confirmó explícitamente cada fecha `marcarSesionDia`. Sirve
-// para desambiguar sesiones de ejercicios compartidos entre días: sin
-// esto, una fecha en la que sólo se entrenó Día A pero que comparte algún
-// ejercicio con Día C generaba también una sesión fantasma para Día C
-// (con esa fecha en su propio historial), y al haber dos sesiones con la
-// misma fecha, cuál "ganaba" en el backend dependía del orden de los días.
+// A qué día(s) confirmó explícitamente cada fecha `marcarSesionDia`. HC
+// guarda una sola sesión por fecha (ver construirSesiones), así que esto
+// sólo se usa para armar la etiqueta `dia` informativa — nunca para decidir
+// qué ejercicios entran, eso siempre es la unión de todos los días.
 function fechasConfirmadasPorDia(dias) {
   const porFecha = new Map();
   dias.forEach((d) => {
@@ -162,27 +160,48 @@ function fechasConfirmadasPorDia(dias) {
   return porFecha;
 }
 
-export function construirSesiones(dias) {
-  const sesiones = [];
-  const confirmadas = fechasConfirmadasPorDia(dias);
-  dias.forEach((dia) => {
-    const fechas = [
-      ...new Set(dia.ejercicios.flatMap((e) => e.historial.map((h) => h.fecha))),
-    ].filter((fecha) => {
-      const diasQueLaConfirman = confirmadas.get(fecha);
-      // Si ningún día confirmó explícitamente esta fecha (historial viejo,
-      // de antes de sesionesFechas), se mantiene el heurístico anterior:
-      // se incluye en todos los días donde aparezca en el historial.
-      return !diasQueLaConfirman || diasQueLaConfirman.has(dia.id);
-    });
+// Nombre de día a mostrar para una fecha. Si algún día confirmó
+// explícitamente haberse entrenado esa fecha, se usan esos (lo normal: uno
+// solo). Si ninguno la confirmó (historial viejo, de antes de
+// sesionesFechas), se listan todos los días donde aparece algún ejercicio
+// con esa fecha — puede ser ambiguo, pero es sólo para mostrar, nunca
+// decide qué ejercicios se incluyen.
+function nombreDiaPara(dias, fecha, diasQueLaConfirman) {
+  const nombres = diasQueLaConfirman
+    ? dias.filter((d) => diasQueLaConfirman.has(d.id)).map((d) => d.nombre)
+    : dias.filter((d) => d.ejercicios.some((e) => e.historial.some((h) => h.fecha === fecha))).map((d) => d.nombre);
+  return [...new Set(nombres)].join(" + ");
+}
 
-    fechas.forEach((fecha) => {
-      const entradas = dia.ejercicios
-        .map((e) => {
+// HC guarda UNA sesión por fecha (upsert que la sobrescribe entera), así
+// que arma exactamente una entrada por fecha, con la unión de TODOS los
+// ejercicios entrenados ese día en cualquier día de la rutina — nunca por
+// día de rutina. Antes se armaba una sesión por (día, fecha), y con
+// historial viejo (sin sesionesFechas) una misma fecha podía generar dos
+// sesiones con días distintos; como HC sólo se queda con una, cuál
+// sobrevivía dependía del orden de los días y los ejercicios exclusivos del
+// otro se perdían enteros al pushear.
+export function construirSesiones(dias) {
+  const confirmadas = fechasConfirmadasPorDia(dias);
+  const todasFechas = [
+    ...new Set(dias.flatMap((d) => d.ejercicios.flatMap((e) => e.historial.map((h) => h.fecha)))),
+  ];
+
+  return todasFechas
+    .map((fecha) => {
+      // Un ejercicio compartido entre días tiene el mismo id y el mismo
+      // historial en todas sus copias — se toma una sola vez.
+      const vistos = new Set();
+      const entradas = [];
+      dias.forEach((d) => {
+        d.ejercicios.forEach((e) => {
+          if (vistos.has(e.id)) return;
           const entrada = e.historial.find((h) => h.fecha === fecha);
-          return entrada ? { e, entrada } : null;
-        })
-        .filter(Boolean);
+          if (!entrada) return;
+          vistos.add(e.id);
+          entradas.push({ e, entrada });
+        });
+      });
 
       const ejercicios = entradas.map(({ e, entrada }) => {
         if (e.tipo === "cardio") {
@@ -228,8 +247,8 @@ export function construirSesiones(dias) {
         }, 0);
 
       const duracion_min = Math.round(minutosCardio + segundosEstimados / 60) || null;
-      sesiones.push({ fecha, dia: dia.nombre, ejercicios, volumen_kg, duracion_min });
-    });
-  });
-  return sesiones.sort((a, b) => a.fecha.localeCompare(b.fecha));
+      const dia = nombreDiaPara(dias, fecha, confirmadas.get(fecha));
+      return { fecha, dia, ejercicios, volumen_kg, duracion_min };
+    })
+    .sort((a, b) => a.fecha.localeCompare(b.fecha));
 }

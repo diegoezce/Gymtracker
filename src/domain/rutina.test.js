@@ -93,6 +93,27 @@ describe("agregarEntradaHistorial", () => {
     expect(resultado[0]).toMatchObject({ duracion: 35, distancia: 5 });
   });
 
+  it("carga una sesión a mano en un ejercicio con historial vacío", () => {
+    // Es el caso de los ejercicios que quedaron sin historial: hay que poder
+    // reconstruirlos desde Progreso, y la entrada tiene que llegar a todas
+    // las copias compartidas del ejercicio.
+    const { dias, banca } = dosDias();
+    const compartido = vincularEjercicio(dias, banca, "b").map((d) => ({
+      ...d,
+      ejercicios: d.ejercicios.map((e) => ({ ...e, historial: [] })),
+    }));
+
+    const entrada = { fecha: "2026-08-31", series: [{ peso: 40, reps: 12, rir: 1 }] };
+    const ejActual = compartido.flatMap((d) => d.ejercicios).find((e) => e.id === banca.id);
+    const resultado = actualizarCompartido(compartido, banca.id, {
+      historial: agregarEntradaHistorial(ejActual.historial ?? [], entrada),
+    });
+
+    const copias = resultado.flatMap((d) => d.ejercicios).filter((e) => e.id === banca.id);
+    expect(copias).toHaveLength(2);
+    copias.forEach((copia) => expect(copia.historial).toEqual([entrada]));
+  });
+
   it("recorta a las últimas 40 entradas", () => {
     const historial = Array.from({ length: 40 }, (_, i) => ({ fecha: `2026-01-${String(i + 1).padStart(2, "0")}`, series: [] }));
     const resultado = agregarEntradaHistorial(historial, { fecha: "2026-03-01", series: [] });

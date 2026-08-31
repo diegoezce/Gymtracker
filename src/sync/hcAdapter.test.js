@@ -90,6 +90,56 @@ describe("aplicarSesiones con tipo tiempo", () => {
   });
 });
 
+describe("aplicarSesiones con ejercicio compartido entre días", () => {
+  // Reproduce el caso real: por el bug de construirSesiones (ya corregido),
+  // TODAS las sesiones históricas en HC quedaron etiquetadas "Día C", aunque
+  // varias en realidad se entrenaron desde Día A. Como "Prensa de piernas"
+  // está compartida (mismo id en ambos días), su historial no debería
+  // depender de qué día quedó anotado en la sesión.
+  function diasConPrensaCompartida() {
+    return [
+      {
+        id: "a",
+        nombre: "Día A",
+        ejercicios: [{ id: "prensa", tipo: "fuerza", nombre: "Prensa de piernas", peso: 80, historial: [] }],
+      },
+      {
+        id: "c",
+        nombre: "Día C",
+        ejercicios: [{ id: "prensa", tipo: "fuerza", nombre: "Prensa de piernas", peso: 80, historial: [] }],
+      },
+    ];
+  }
+
+  const sesionesMalEtiquetadas = [
+    { fecha: "2026-08-24", dia: "Día C", ejercicios: [{ nombre: "Prensa de piernas", series: [{ peso: 97, reps: 10, rir: 1 }] }] },
+    { fecha: "2026-08-31", dia: "Día C", ejercicios: [{ nombre: "Prensa de piernas", series: [{ peso: 86, reps: 9, rir: 0 }] }] },
+  ];
+
+  it("le llega el historial completo a la copia de Día A aunque HC etiquete todo como Día C", () => {
+    const resultado = aplicarSesiones(diasConPrensaCompartida(), sesionesMalEtiquetadas);
+    const prensaA = resultado.find((d) => d.id === "a").ejercicios[0];
+    expect(prensaA.historial).toHaveLength(2);
+    expect(prensaA.peso).toBe(86); // peso de la sesión más reciente (31/08)
+  });
+
+  it("un ejercicio NO compartido sigue filtrando por día (sin falsos positivos)", () => {
+    const dias = [
+      {
+        id: "a",
+        nombre: "Día A",
+        ejercicios: [{ id: "solo-a", tipo: "fuerza", nombre: "Curl bíceps", peso: 20, historial: [] }],
+      },
+      { id: "c", nombre: "Día C", ejercicios: [] },
+    ];
+    const sesiones = [
+      { fecha: "2026-08-24", dia: "Día C", ejercicios: [{ nombre: "Curl bíceps", series: [{ peso: 25, reps: 10, rir: 1 }] }] },
+    ];
+    const resultado = aplicarSesiones(dias, sesiones);
+    expect(resultado[0].ejercicios[0].historial).toEqual([]);
+  });
+});
+
 describe("construirSesiones con sesión mixta (fuerza + tiempo)", () => {
   it("da un volumen_kg numérico en vez de NaN cuando hay un ejercicio de tiempo ese día", () => {
     const dias = [

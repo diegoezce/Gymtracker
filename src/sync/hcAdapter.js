@@ -1,3 +1,5 @@
+import { diasDondeAparece } from "../domain/rutina";
+
 const HC_URL = "https://hc.sparkio.me";
 
 export const TOKEN_KEY = "gym:hc:token";
@@ -48,7 +50,16 @@ export function aplicarSesiones(dias, sesiones) {
   return dias.map((dia) => ({
     ...dia,
     ejercicios: dia.ejercicios.map((ej) => {
-      const sesionesDelDia = sesiones.filter((s) => s.dia === dia.nombre);
+      // Un ejercicio compartido entre días (mismo id) puede haberse
+      // entrenado bajo cualquiera de esos días, y el campo `dia` de la
+      // sesión en HC no siempre es confiable (ver construirSesiones): antes
+      // de que existiera `sesionesFechas`, cualquier sesión que tocara un
+      // ejercicio compartido podía quedar etiquetada con el día equivocado.
+      // Por eso, para ejercicios compartidos se busca en TODAS las
+      // sesiones por nombre, sin filtrar por día — total, comparten el
+      // mismo historial sin importar bajo cuál día se entrenaron.
+      const esCompartido = diasDondeAparece(dias, ej.id).length > 1;
+      const sesionesDelDia = esCompartido ? sesiones : sesiones.filter((s) => s.dia === dia.nombre);
       if (ej.tipo === "cardio") {
         const historial = sesionesDelDia
           .flatMap((s) => {

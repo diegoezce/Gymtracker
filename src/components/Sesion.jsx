@@ -172,9 +172,13 @@ export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarSerieT
   const hayMasSeries = sesion.series.length > 0 && sesion.series.length < objetivoSeries;
   const esTiempo = ej.tipo === "tiempo";
   const historialPrevio = ej.historial.filter((h) => h.fecha !== hoy());
+  // Busca desde el final: la entrada más reciente puede no tener series
+  // cargadas (p.ej. un registro corregido a mano en Progreso quedó con el
+  // array vacío), y en ese caso hay que mirar la anterior en vez de asumir
+  // que la última siempre trae datos.
   const ultimaSerie =
     ej.tipo === "fuerza"
-      ? historialPrevio[historialPrevio.length - 1]?.series.slice(-1)[0]
+      ? [...historialPrevio].reverse().find((h) => h.series?.length > 0)?.series.slice(-1)[0]
       : null;
 
   // Re-schedule SW notification when mounting with a restored timer

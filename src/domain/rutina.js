@@ -86,13 +86,22 @@ export function ultimaFechaDia(dias, diaId) {
   return fechas[fechas.length - 1] ?? null;
 }
 
-// Marca la fecha en la que se entrenó este día en concreto, en un campo
-// propio del día (`ultimaSesion`) — independiente del historial de sus
-// ejercicios, que puede estar compartido con otros días y por lo tanto no
-// sirve para saber cuándo se entrenó ESTE día. Se llama cada vez que se
-// guarda una serie/registro real durante una sesión (ver App.jsx).
+// Marca la fecha en la que se entrenó este día en concreto, en dos campos
+// propios del día — independientes del historial de sus ejercicios, que
+// puede estar compartido con otros días y por lo tanto no sirve para saber
+// cuándo se entrenó ESTE día en particular:
+//   - `ultimaSesion`: la fecha más reciente (usada por Inicio.jsx).
+//   - `sesionesFechas`: todas las fechas entrenadas de ESTE día, para que
+//     construirSesiones (hcAdapter) sepa a qué día atribuir cada sesión sin
+//     tener que adivinar a partir de ejercicios compartidos.
+// Se llama cada vez que se guarda una serie/registro real durante una
+// sesión (ver App.jsx).
 export function marcarSesionDia(dias, diaId, fecha) {
-  return dias.map((d) => (d.id === diaId ? { ...d, ultimaSesion: fecha } : d));
+  return dias.map((d) =>
+    d.id === diaId
+      ? { ...d, ultimaSesion: fecha, sesionesFechas: [...new Set([...(d.sesionesFechas ?? []), fecha])].sort() }
+      : d
+  );
 }
 
 // ── días ────────────────────────────────────────────────────────

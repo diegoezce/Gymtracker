@@ -325,6 +325,15 @@ describe("marcarSesionDia", () => {
     const segunda = marcarSesionDia(primera, "a", "2026-08-26");
     expect(segunda[0].ultimaSesion).toBe("2026-08-26");
   });
+
+  it("acumula cada fecha entrenada en sesionesFechas, sin duplicar", () => {
+    const { dias } = dosDias();
+    let marcados = marcarSesionDia(dias, "a", "2026-08-01");
+    marcados = marcarSesionDia(marcados, "a", "2026-08-26");
+    marcados = marcarSesionDia(marcados, "a", "2026-08-01"); // repetida, no debe duplicarse
+    expect(marcados[0].sesionesFechas).toEqual(["2026-08-01", "2026-08-26"]);
+    expect(marcados[1].sesionesFechas).toBeUndefined();
+  });
 });
 
 describe("resincronizarCompartidos", () => {

@@ -259,16 +259,56 @@ describe("construirSesiones con ejercicios compartidos entre días", () => {
     ];
   }
 
-  it("sin sesionesFechas (dato viejo) genera una sesión fantasma por cada día que comparte el ejercicio", () => {
+  it("sin sesionesFechas (dato viejo), arma una sola sesión con los días ambiguos listados en `dia`", () => {
+    // HC guarda una sesión por fecha: nunca hay que generar dos, aunque no
+    // se sepa con certeza cuál de los días se entrenó de verdad.
     const sesiones = construirSesiones(diasConEjercicioCompartido());
-    expect(sesiones.map((s) => s.dia)).toEqual(["Día A", "Día C"]);
+    expect(sesiones).toHaveLength(1);
+    expect(sesiones[0].dia).toBe("Día A + Día C");
+    expect(sesiones[0].ejercicios).toHaveLength(1); // el ejercicio compartido no se duplica
   });
 
-  it("con sesionesFechas, sólo genera la sesión del día realmente entrenado", () => {
+  it("con sesionesFechas, la sesión queda etiquetada con el día realmente entrenado", () => {
     const dias = diasConEjercicioCompartido({ a: { sesionesFechas: ["2026-08-31"] }, c: { sesionesFechas: [] } });
     const sesiones = construirSesiones(dias);
     expect(sesiones).toHaveLength(1);
     expect(sesiones[0].dia).toBe("Día A");
+  });
+
+  it("une ejercicios exclusivos de días distintos entrenados la misma fecha en una sola sesión", () => {
+    // Caso real: Día A y Día B comparten "Prensa de piernas" pero cada uno
+    // tiene además ejercicios propios (Curl bíceps sólo en A, Remo sólo en
+    // B). Antes esto generaba dos sesiones con la misma fecha y HC se
+    // quedaba con una sola, perdiendo los ejercicios exclusivos del otro día.
+    const historialPrensa = [{ fecha: "2026-08-31", series: [{ peso: 90, reps: 8, rir: 1 }] }];
+    const dias = [
+      {
+        id: "a",
+        nombre: "Día A",
+        sesionesFechas: ["2026-08-31"],
+        ejercicios: [
+          { id: "prensa", tipo: "fuerza", nombre: "Prensa de piernas", historial: historialPrensa },
+          {
+            id: "curl-a",
+            tipo: "fuerza",
+            nombre: "Curl bíceps",
+            historial: [{ fecha: "2026-08-31", series: [{ peso: 20, reps: 10, rir: 1 }] }],
+          },
+        ],
+      },
+      {
+        id: "b",
+        nombre: "Día B",
+        sesionesFechas: [],
+        ejercicios: [
+          { id: "prensa", tipo: "fuerza", nombre: "Prensa de piernas", historial: historialPrensa },
+          { id: "remo-b", tipo: "fuerza", nombre: "Remo", historial: [] },
+        ],
+      },
+    ];
+    const sesiones = construirSesiones(dias);
+    expect(sesiones).toHaveLength(1);
+    expect(sesiones[0].ejercicios.map((e) => e.nombre).sort()).toEqual(["Curl bíceps", "Prensa de piernas"]);
   });
 });
 

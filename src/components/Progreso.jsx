@@ -60,27 +60,22 @@ function Grafico({ datos, color = C.sodio }) {
   );
 }
 
-export function Progreso({ dias, volver, onEditarHistorial, onEliminarHistorial }) {
+export function Progreso({ dias, volver, onEditarHistorial, onEliminarHistorial, onFusionarHistorial }) {
   const [detalleId, setDetalleId] = useState(null);
   const ahora = new Date();
 
-  // Par único (diaId, fecha) = una sesión
-  const todasSesiones = [
-    ...new Set(
-      dias.flatMap((d) => d.ejercicios.flatMap((e) => e.historial.map((h) => `${d.id}::${h.fecha}`)))
-    ),
+  // Una sesión = una fecha de calendario, sin importar cuántos ejercicios
+  // (o días de rutina, si el ejercicio está compartido) se entrenaron ese día.
+  const todasFechas = [
+    ...new Set(dias.flatMap((d) => d.ejercicios.flatMap((e) => e.historial.map((h) => h.fecha)))),
   ].sort();
 
-  const todasFechas = [...new Set(todasSesiones.map((s) => s.split("::")[1]))].sort();
   const ultimaFecha = todasFechas[todasFechas.length - 1];
 
-  const estasSemana = todasSesiones.filter((s) => {
-    const f = s.split("::")[1];
-    return (ahora - new Date(f)) / 86400000 < 7;
-  }).length;
+  const estasSemana = todasFechas.filter((f) => (ahora - new Date(f)) / 86400000 < 7).length;
 
-  const esteMes = todasSesiones.filter((s) => {
-    const d = new Date(s.split("::")[1]);
+  const esteMes = todasFechas.filter((f) => {
+    const d = new Date(f);
     return d.getMonth() === ahora.getMonth() && d.getFullYear() === ahora.getFullYear();
   }).length;
 
@@ -102,8 +97,10 @@ export function Progreso({ dias, volver, onEditarHistorial, onEliminarHistorial 
     return (
       <DetalleEjercicio
         ejercicio={ejDetalle}
+        dias={dias}
         onEditar={(fecha, cambios) => onEditarHistorial(ejDetalle.id, fecha, cambios)}
         onEliminar={(fecha) => onEliminarHistorial(ejDetalle.id, fecha)}
+        onFusionar={(otroId) => onFusionarHistorial(ejDetalle.id, otroId)}
         volver={() => setDetalleId(null)}
       />
     );
@@ -117,7 +114,7 @@ export function Progreso({ dias, volver, onEditarHistorial, onEliminarHistorial 
           {[
             { label: "Esta semana", valor: estasSemana },
             { label: "Este mes", valor: esteMes },
-            { label: "Total", valor: todasSesiones.length },
+            { label: "Total", valor: todasFechas.length },
           ].map(({ label, valor }) => (
             <div
               key={label}
@@ -248,6 +245,7 @@ export function Progreso({ dias, volver, onEditarHistorial, onEliminarHistorial 
           }));
           const pr = Math.max(...pesoData.map((d) => d.valor));
           const prFecha = pesoData.find((d) => d.valor === pr)?.fecha;
+          const ultima = e.historial[e.historial.length - 1];
           const volUltima = volData[volData.length - 1]?.valor ?? 0;
 
           return (
@@ -257,6 +255,7 @@ export function Progreso({ dias, volver, onEditarHistorial, onEliminarHistorial 
                 <span style={{ color: C.sodio, fontWeight: 700 }}>PR {fmt(pr)} kg</span>
                 {prFecha && <span> · {fechaCorta(prFecha)}</span>}
                 <span> · {e.historial.length} sesión{e.historial.length !== 1 ? "es" : ""}</span>
+                {ultima && <span> · última {fechaCorta(ultima.fecha)}</span>}
               </div>
 
               <Etiqueta>Peso máximo (kg)</Etiqueta>

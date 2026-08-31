@@ -8,28 +8,27 @@ import { Etiqueta } from "./Etiqueta";
 import { Repeticiones } from "./Repeticiones";
 import { TiempoInput } from "./TiempoInput";
 import { Boton } from "./Boton";
+import { ModalTecnica } from "./ModalTecnica";
 
 const R = 54;
 const CIRC = 2 * Math.PI * R;
 
 /* ── notificaciones ── */
 
-async function pedirPermiso() {
-  if (!("Notification" in window)) return false;
-  if (Notification.permission === "granted") return true;
-  if (Notification.permission === "denied") return false;
-  const result = await Notification.requestPermission();
-  return result === "granted";
+// Sólo consulta el permiso, nunca lo pide: Safari en iOS exige un gesto
+// directo del usuario para conceder Notification.requestPermission(), y esto
+// corre desde un useEffect. El permiso se pide desde el panel de Ajustes.
+function tienePermiso() {
+  return "Notification" in window && Notification.permission === "granted";
 }
 
-async function programarNotificacion(finTimestamp) {
-  const ok = await pedirPermiso();
-  if (!ok || !navigator.serviceWorker) return;
+async function programarNotificacion(ejId, finTimestamp) {
+  if (!tienePermiso() || !navigator.serviceWorker) return;
   try {
     const reg = await navigator.serviceWorker.ready;
     reg.active?.postMessage({
       type: "SCHEDULE_NOTIFICATION",
-      tag: "rest-timer",
+      tag: `rest-timer-${ejId}`,
       title: "¡Terminó el descanso!",
       body: "A moverse. Próxima serie lista.",
       timestamp: finTimestamp,
@@ -37,11 +36,13 @@ async function programarNotificacion(finTimestamp) {
   } catch (_) {}
 }
 
-function cancelarNotificacion() {
+async function cancelarNotificacion(ejId) {
+  if (!navigator.serviceWorker) return;
   try {
-    navigator.serviceWorker?.controller?.postMessage({
+    const reg = await navigator.serviceWorker.ready;
+    reg.active?.postMessage({
       type: "CANCEL_NOTIFICATION",
-      tag: "rest-timer",
+      tag: `rest-timer-${ejId}`,
     });
   } catch (_) {}
 }
@@ -156,7 +157,7 @@ function SesionCardio({ ej, guardarCardio, salir }) {
 
 /* ── sesión principal ── */
 
-export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarSerieTiempo, guardarCardio, initialTimerFin = null, salir, terminarEjercicio }) {
+export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarSerieTiempo, guardarCardio, agregarSerieExtra, initialTimerFin = null, salir, terminarEjercicio }) {
   // Restore timer from saved state if returning to an exercise mid-session
   const validoInicial = initialTimerFin && initialTimerFin > Date.now() ? initialTimerFin : null;
   const [timerFin, setTimerFin] = useState(validoInicial);
@@ -167,16 +168,22 @@ export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarSerieT
   // Skip the timer-start effect on mount so a restored timer isn't overwritten
   const mountHandled = useRef(false);
 
-  const hayMasSeries = sesion.series.length > 0 && sesion.series.length < ej.series;
+  const objetivoSeries = ej.tipo !== "cardio" ? ej.series + (sesion.extra?.[ej.id] ?? 0) : 0;
+  const hayMasSeries = sesion.series.length > 0 && sesion.series.length < objetivoSeries;
   const esTiempo = ej.tipo === "tiempo";
   const historialPrevio = ej.historial.filter((h) => h.fecha !== hoy());
-  const ultimaSerie = !esTiempo
-    ? historialPrevio[historialPrevio.length - 1]?.series.slice(-1)[0]
-    : null;
+  // Busca desde el final: la entrada más reciente puede no tener series
+  // cargadas (p.ej. un registro corregido a mano en Progreso quedó con el
+  // array vacío), y en ese caso hay que mirar la anterior en vez de asumir
+  // que la última siempre trae datos.
+  const ultimaSerie =
+    ej.tipo === "fuerza"
+      ? [...historialPrevio].reverse().find((h) => h.series?.length > 0)?.series.slice(-1)[0]
+      : null;
 
   // Re-schedule SW notification when mounting with a restored timer
   useEffect(() => {
-    if (timerFin) programarNotificacion(timerFin);
+    if (timerFin) programarNotificacion(ej.id, timerFin);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Start/stop timer when series count changes (skip on initial mount)
@@ -190,7 +197,7 @@ export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarSerieT
       setTimerFin(fin);
       setTimerSeg(ej.descanso);
       prevSeg.current = ej.descanso;
-      programarNotificacion(fin);
+      programarNotificacion(ej.id, fin);
     } else {
       setTimerFin(null);
       setTimerSeg(null);
@@ -221,13 +228,15 @@ export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarSerieT
   }, [timerFin]);
 
   const saltarTimer = () => {
-    cancelarNotificacion();
+    cancelarNotificacion(ej.id);
     setTimerFin(null);
     setTimerSeg(null);
     prevSeg.current = null;
   };
 
   const [editandoIdx, setEditandoIdx] = useState(null);
+  const [modalTecnica, setModalTecnica] = useState(false);
+  const tieneTecnica = ej.tecnica?.trim() || ej.imagenUrl?.trim();
 
   const editarSerie = (i, campo, valor) => {
     const nuevas = sesion.series.map((s, idx) =>
@@ -238,21 +247,62 @@ export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarSerieT
 
   return (
     <Marco>
-      <Cabecera izq={`${dia.nombre} · ${sesion.ejIdx + 1}/${dia.ejercicios.length}`} onSalir={salir} />
+      <Cabecera izq={`${dia.nombre} · ${sesion.ejIdx + 1}/${dia.ejercicios.length}`} onSalir={() => salir(timerFin)} />
+      {modalTecnica && <ModalTecnica ej={ej} onCerrar={() => setModalTecnica(false)} />}
       {ej.tipo === "cardio" ? (
         <SesionCardio ej={ej} guardarCardio={guardarCardio} salir={salir} />
       ) : (
         <div style={{ padding: "8px 20px 32px" }}>
-          <h1 style={{ fontFamily: SANS, fontSize: 30, fontWeight: 700, lineHeight: 1.1, color: C.hueso, margin: "16px 0 4px" }}>
-            {ej.nombre}
-          </h1>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 10, margin: "16px 0 4px" }}>
+            <h1 style={{ fontFamily: SANS, fontSize: 30, fontWeight: 700, lineHeight: 1.1, color: C.hueso, margin: 0, flex: 1 }}>
+              {ej.nombre}
+            </h1>
+            {tieneTecnica && (
+              <button
+                onClick={() => setModalTecnica(true)}
+                style={{
+                  flexShrink: 0,
+                  marginTop: 4,
+                  width: 28,
+                  height: 28,
+                  borderRadius: "50%",
+                  border: `1px solid ${C.gris}`,
+                  background: "none",
+                  color: C.gris,
+                  fontFamily: SANS,
+                  fontSize: 14,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  lineHeight: 1,
+                }}
+              >
+                ?
+              </button>
+            )}
+          </div>
           <Etiqueta>
-            Serie {sesion.series.length + 1} de {ej.series} · objetivo{" "}
+            Serie {sesion.series.length + 1} de {objetivoSeries} · objetivo{" "}
             {esTiempo
               ? `${ej.duracionObjetivo}s`
               : `${ej.repsMax ? `${ej.repsObjetivo}–${ej.repsMax}` : ej.repsObjetivo} reps`}
             {ej.descanso ? ` · ${ej.descanso}s descanso` : ""}
           </Etiqueta>
+          <button
+            onClick={agregarSerieExtra}
+            style={{
+              background: "none",
+              border: "none",
+              padding: 0,
+              marginTop: 6,
+              color: C.sodio,
+              fontFamily: SANS,
+              fontSize: 12,
+              cursor: "pointer",
+              WebkitTapHighlightColor: "transparent",
+            }}
+          >
+            + agregar una serie más
+          </button>
 
           {!esTiempo && (
             <div style={{ marginTop: 6, fontFamily: MONO, fontSize: 12, color: C.gris, opacity: 0.75 }}>
@@ -297,7 +347,7 @@ export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarSerieT
 
           <div style={{ marginTop: 28, display: "flex", flexDirection: "column", gap: 8 }}>
             {sesion.series.length > 0 && (
-              <Boton tono="fuerte" alto={50} onClick={() => { cancelarNotificacion(); terminarEjercicio(); }}>
+              <Boton tono="fuerte" alto={50} onClick={() => { cancelarNotificacion(ej.id); terminarEjercicio(); }}>
                 Terminar ejercicio
               </Boton>
             )}

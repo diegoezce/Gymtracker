@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
+import { version } from "../../package.json";
 import { C, MONO, SANS } from "../theme";
+import { exportarRutina, importarRutina, resumenDias } from "../domain/compartir";
 import {
   actualizarCompartido,
   diasDondeAparece,
@@ -8,6 +10,8 @@ import {
   crearDia,
   diaPierdeHistorial,
   moverEjercicioOrden,
+  fusionarDias,
+  eliminarEjercicioDeTodos,
 } from "../domain/rutina";
 import { Marco } from "./Marco";
 import { Cabecera } from "./Cabecera";
@@ -115,6 +119,60 @@ function Toggle({ activo, onChange }) {
         }}
       />
     </button>
+  );
+}
+
+/* ── campos técnica (compartido por todas las tarjetas) ── */
+
+function CamposTecnica({ ej, onEditar }) {
+  return (
+    <>
+      <div>
+        <Label>Notas de técnica</Label>
+        <textarea
+          value={ej.tecnica ?? ""}
+          onChange={(ev) => onEditar("tecnica", ev.target.value)}
+          placeholder="Describe la ejecución, puntos clave, errores comunes…"
+          rows={3}
+          style={{
+            width: "100%",
+            background: C.sup2,
+            color: C.hueso,
+            border: `1px solid ${C.linea}`,
+            borderRadius: 4,
+            padding: "10px 12px",
+            fontFamily: SANS,
+            fontSize: 14,
+            lineHeight: 1.5,
+            boxSizing: "border-box",
+            resize: "vertical",
+            outline: "none",
+          }}
+        />
+      </div>
+      <div>
+        <Label>URL de imagen (opcional)</Label>
+        <input
+          type="url"
+          value={ej.imagenUrl ?? ""}
+          onChange={(ev) => onEditar("imagenUrl", ev.target.value)}
+          placeholder="https://..."
+          autoCapitalize="none"
+          style={{
+            width: "100%",
+            background: C.sup2,
+            color: C.hueso,
+            border: `1px solid ${C.linea}`,
+            borderRadius: 4,
+            padding: "10px 12px",
+            fontFamily: SANS,
+            fontSize: 14,
+            boxSizing: "border-box",
+            outline: "none",
+          }}
+        />
+      </div>
+    </>
   );
 }
 
@@ -270,17 +328,18 @@ function TarjetaCardio({ ej, diaId, dias, idx, total, onEditar, onQuitar, onMove
         </div>
       </div>
 
-      {dias.length > 1 && (
-        <>
-          <button
-            onClick={() => setAbierto((a) => !a)}
-            style={{ width: "100%", background: "none", border: "none", borderTop: `1px solid ${C.linea}`, color: C.gris, fontFamily: SANS, fontSize: 12, padding: "8px 14px", cursor: "pointer", textAlign: "left", display: "flex", justifyContent: "space-between" }}
-          >
-            <span>Mover a otro día</span>
-            <span>{abierto ? "▲" : "▼"}</span>
-          </button>
-          {abierto && (
-            <div style={{ padding: "10px 14px 14px", borderTop: `1px solid ${C.linea}`, display: "flex", gap: 6, flexWrap: "wrap" }}>
+      <button
+        onClick={() => setAbierto((a) => !a)}
+        style={{ width: "100%", background: "none", border: "none", borderTop: `1px solid ${C.linea}`, color: C.gris, fontFamily: SANS, fontSize: 12, padding: "8px 14px", cursor: "pointer", textAlign: "left", display: "flex", justifyContent: "space-between" }}
+      >
+        <span>Técnica{dias.length > 1 ? " · mover" : ""}</span>
+        <span>{abierto ? "▲" : "▼"}</span>
+      </button>
+      {abierto && (
+        <div style={{ padding: "10px 14px 14px", borderTop: `1px solid ${C.linea}`, display: "flex", flexDirection: "column", gap: 10 }}>
+          <CamposTecnica ej={ej} onEditar={e} />
+          {dias.length > 1 && (
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
               {dias.filter((d) => d.id !== diaId).map((d) => (
                 <button key={d.id} onClick={() => onMover(diaId, ej.id, d.id)}
                   style={{ background: "none", border: `1px solid ${C.linea}`, borderRadius: 4, color: C.gris, fontFamily: SANS, fontSize: 13, padding: "6px 12px", cursor: "pointer" }}>
@@ -289,7 +348,7 @@ function TarjetaCardio({ ej, diaId, dias, idx, total, onEditar, onQuitar, onMove
               ))}
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   );
@@ -334,6 +393,8 @@ function TarjetaTiempo({ ej, diaId, dias, idx, total, onEditar, onQuitar, onMove
             <Label>Incremento (s)</Label>
             <NumInput value={ej.incremento} onChange={(v) => e("incremento", v)} step={5} min={5} />
           </div>
+
+          <CamposTecnica ej={ej} onEditar={e} />
 
           {dias.length > 1 && (
             <div>
@@ -409,6 +470,8 @@ function TarjetaFuerza({ ej, diaId, dias, idx, total, onEditar, onQuitar, onMove
             </div>
           </div>
 
+          <CamposTecnica ej={ej} onEditar={e} />
+
           {dias.length > 1 && (
             <div>
               <Label>Mover a otro día</Label>
@@ -437,6 +500,266 @@ function TarjetaEjercicio(props) {
   if (props.ej.tipo === "cardio") return <TarjetaCardio {...props} />;
   if (props.ej.tipo === "tiempo") return <TarjetaTiempo {...props} />;
   return <TarjetaFuerza {...props} />;
+}
+
+/* ── panel administrar ejercicios ── */
+
+// Lista deduplicada por id de todo ejercicio del plan (sin importar en
+// cuántos días esté vinculado), con administración centralizada: cada
+// copia por día se edita con las mismas tarjetas que ya usa la lista de
+// días de abajo, y se agrega una acción para borrarlo de todos los días
+// a la vez (hoy sólo existe "quitar de este día" por día).
+function PanelEjercicios({ dias, editar, quitarEjercicio, moverEjercicio, moverOrden, onEliminar, onCrear }) {
+  const [expandido, setExpandido] = useState(null);
+  const [confirmandoEliminar, setConfirmandoEliminar] = useState(null);
+
+  const vistos = new Set();
+  const ejercicios = dias
+    .flatMap((d) => d.ejercicios)
+    .filter((e) => {
+      if (vistos.has(e.id)) return false;
+      vistos.add(e.id);
+      return true;
+    })
+    .sort((a, b) => a.nombre.localeCompare(b.nombre));
+
+  return (
+    <div style={{ marginTop: 36, paddingTop: 24, borderTop: `1px solid ${C.linea}` }}>
+      <div style={{ fontFamily: SANS, fontSize: 16, fontWeight: 700, color: C.hueso, marginBottom: 16 }}>
+        Ejercicios
+      </div>
+
+      {ejercicios.length === 0 ? (
+        <p style={{ fontFamily: SANS, color: C.gris, fontSize: 14, lineHeight: 1.5 }}>
+          Todavía no hay ejercicios.
+        </p>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
+          {ejercicios.map((ej) => {
+            const enDias = dias.filter((d) => d.ejercicios.some((e) => e.id === ej.id));
+            const abierto = expandido === ej.id;
+            return (
+              <div key={ej.id} style={{ background: C.sup, border: `1px solid ${C.linea}`, borderRadius: 6, overflow: "hidden" }}>
+                <button
+                  onClick={() => setExpandido(abierto ? null : ej.id)}
+                  style={{
+                    width: "100%",
+                    textAlign: "left",
+                    background: "none",
+                    border: "none",
+                    padding: "14px 16px",
+                    cursor: "pointer",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: 10,
+                    WebkitTapHighlightColor: "transparent",
+                  }}
+                >
+                  <div>
+                    <div style={{ fontFamily: SANS, fontSize: 16, fontWeight: 600, color: C.hueso }}>{ej.nombre}</div>
+                    <div style={{ fontFamily: MONO, fontSize: 12, color: C.gris, marginTop: 4 }}>
+                      {enDias.map((d) => d.nombre).join(" · ")}
+                    </div>
+                  </div>
+                  <span style={{ color: C.gris, fontFamily: "ui-monospace, monospace", fontSize: 14, flexShrink: 0 }}>
+                    {abierto ? "▲" : "▼"}
+                  </span>
+                </button>
+
+                {abierto && (
+                  <div style={{ padding: "0 12px 14px" }}>
+                    {enDias.map((d) => {
+                      const ejEnDia = d.ejercicios.find((e) => e.id === ej.id);
+                      return (
+                        <div key={d.id}>
+                          {enDias.length > 1 && (
+                            <div style={{ fontFamily: SANS, fontSize: 11, color: C.gris, textTransform: "uppercase", letterSpacing: "0.08em", margin: "10px 0 6px" }}>
+                              {d.nombre}
+                            </div>
+                          )}
+                          <TarjetaEjercicio
+                            ej={ejEnDia}
+                            diaId={d.id}
+                            dias={dias}
+                            idx={0}
+                            total={1}
+                            onEditar={editar}
+                            onQuitar={quitarEjercicio}
+                            onMover={moverEjercicio}
+                            onMoverOrden={moverOrden}
+                          />
+                        </div>
+                      );
+                    })}
+
+                    {confirmandoEliminar === ej.id ? (
+                      <div style={{ padding: "12px 14px", background: "#2a1a1a", border: `1px solid #3a2a2a`, borderRadius: 6, marginTop: 4 }}>
+                        <div style={{ fontFamily: SANS, fontSize: 13, color: C.hueso, lineHeight: 1.45 }}>
+                          Se borra de {enDias.length > 1 ? `los ${enDias.length} días donde aparece` : `"${enDias[0].nombre}"`}
+                          {ej.historial.length > 0
+                            ? `, junto con ${ej.historial.length} ${ej.historial.length === 1 ? "sesión registrada" : "sesiones registradas"}`
+                            : ""}
+                          . No se puede deshacer.
+                        </div>
+                        <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                          <button onClick={() => setConfirmandoEliminar(null)} style={CONFIRM_BTN}>
+                            Cancelar
+                          </button>
+                          <button
+                            onClick={() => { onEliminar(ej.id); setConfirmandoEliminar(null); setExpandido(null); }}
+                            style={{ ...CONFIRM_BTN, color: "#c0392b", borderColor: "#3a2a2a" }}
+                          >
+                            Eliminar igual
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmandoEliminar(ej.id)}
+                        style={{ width: "100%", marginTop: 4, background: "none", border: `1px solid #3a2a2a`, borderRadius: 4, color: "#c0392b", fontFamily: SANS, fontSize: 13, padding: "10px 0", cursor: "pointer" }}
+                      >
+                        Eliminar ejercicio{enDias.length > 1 ? " de todos los días" : ""}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <button
+        onClick={onCrear}
+        style={{ width: "100%", background: "none", border: `1px dashed ${C.sodio}`, borderRadius: 6, color: C.sodio, fontFamily: SANS, fontSize: 15, fontWeight: 600, padding: "15px 0", cursor: "pointer" }}
+      >
+        + Crear ejercicio
+      </button>
+    </div>
+  );
+}
+
+/* ── panel compartir rutina ── */
+
+function PanelCompartir({ dias, onImportar }) {
+  const [modo, setModo] = useState(null); // null | "importar"
+  const [texto, setTexto] = useState("");
+  const [preview, setPreview] = useState(null); // dias parseados esperando confirmación
+  const [error, setError] = useState("");
+  const [copiado, setCopiado] = useState(false);
+  const textareaRef = useRef(null);
+
+  async function exportar() {
+    const json = exportarRutina(dias);
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "Mi rutina de gym", text: json });
+        return;
+      } catch {
+        // si cancela o falla, copiamos al clipboard
+      }
+    }
+    await navigator.clipboard.writeText(json);
+    setCopiado(true);
+    setTimeout(() => setCopiado(false), 2000);
+  }
+
+  function parsear() {
+    setError("");
+    try {
+      const nuevos = importarRutina(texto, dias);
+      setPreview(nuevos);
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  function confirmarImport() {
+    onImportar(preview);
+    setPreview(null);
+    setTexto("");
+    setModo(null);
+  }
+
+  return (
+    <div style={{ marginTop: 36, paddingTop: 24, borderTop: `1px solid ${C.linea}` }}>
+      <div style={{ fontFamily: SANS, fontSize: 16, fontWeight: 700, color: C.hueso, marginBottom: 16 }}>
+        Compartir rutina
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <Boton tono="fuerte" alto={54} onClick={exportar}>
+          {copiado ? "Copiado al portapapeles" : "Exportar mi rutina"}
+        </Boton>
+
+        <Boton
+          tono="fantasma"
+          alto={46}
+          onClick={() => { setModo(modo === "importar" ? null : "importar"); setError(""); setPreview(null); setTexto(""); }}
+        >
+          {modo === "importar" ? "Cancelar importación" : "Importar rutina"}
+        </Boton>
+
+        {modo === "importar" && !preview && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ fontFamily: SANS, fontSize: 12, color: C.gris, lineHeight: 1.5 }}>
+              Pegá el JSON que te compartieron y tocá "Previsualizar".
+            </div>
+            <textarea
+              ref={textareaRef}
+              value={texto}
+              onChange={(e) => setTexto(e.target.value)}
+              rows={6}
+              placeholder='{"v":1,"dias":[...]}'
+              style={{
+                width: "100%",
+                background: C.sup2,
+                color: C.hueso,
+                border: `1px solid ${C.linea}`,
+                borderRadius: 4,
+                padding: "10px 12px",
+                fontFamily: MONO,
+                fontSize: 12,
+                boxSizing: "border-box",
+                resize: "vertical",
+                outline: "none",
+              }}
+            />
+            <Boton tono="neutro" alto={46} onClick={parsear}>
+              Previsualizar
+            </Boton>
+            {error && (
+              <div style={{ fontFamily: SANS, fontSize: 13, color: C.oxido }}>{error}</div>
+            )}
+          </div>
+        )}
+
+        {preview && (
+          <div style={{ background: C.sup, border: `1px solid ${C.sodio}`, borderRadius: 6, padding: "12px 14px" }}>
+            <div style={{ fontFamily: SANS, fontSize: 13, color: C.hueso, lineHeight: 1.5 }}>
+              Tu rutina local ({resumenDias(dias)}) se reemplaza por la importada ({resumenDias(preview)}).
+              El historial de los ejercicios que coincidan se conserva.
+            </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+              <button
+                onClick={() => { setPreview(null); setModo(null); }}
+                style={{ background: "none", border: `1px solid ${C.linea}`, borderRadius: 4, color: C.gris, fontFamily: SANS, fontSize: 13, padding: "7px 14px", cursor: "pointer" }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmarImport}
+                style={{ background: "none", border: `1px solid ${C.sodio}`, borderRadius: 4, color: C.sodio, fontFamily: SANS, fontSize: 13, padding: "7px 14px", cursor: "pointer" }}
+              >
+                Importar igual
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 /* ── panel de sync ── */
@@ -696,15 +1019,285 @@ function SyncPanel({ dias, traerHistorialDeHC, aplicarRutinaDeHC }) {
   );
 }
 
+function esStandalone() {
+  return (
+    window.navigator.standalone === true ||
+    window.matchMedia?.("(display-mode: standalone)").matches === true
+  );
+}
+
+function NotificacionesPanel() {
+  const soportado = "Notification" in window;
+  const [permiso, setPermiso] = useState(soportado ? Notification.permission : null);
+  const [pidiendo, setPidiendo] = useState(false);
+  const [prueba, setPrueba] = useState("idle"); // idle | enviada | sin-sw | error
+
+  // Si va a Ajustes del iPhone a desbloquearlas y vuelve, la app se reanuda
+  // sin recargar: hay que releer el permiso al volver a primer plano.
+  useEffect(() => {
+    if (!soportado) return;
+    const releer = () => {
+      if (document.visibilityState === "visible") setPermiso(Notification.permission);
+    };
+    document.addEventListener("visibilitychange", releer);
+    window.addEventListener("focus", releer);
+    return () => {
+      document.removeEventListener("visibilitychange", releer);
+      window.removeEventListener("focus", releer);
+    };
+  }, [soportado]);
+
+  // OJO: requestPermission() tiene que salir de un gesto real del usuario.
+  // Se llama sincrónicamente dentro del onClick, sin ningún await antes.
+  function activar() {
+    const aplicar = (r) => {
+      setPermiso(r ?? Notification.permission);
+      setPidiendo(false);
+    };
+    try {
+      const p = Notification.requestPermission(aplicar); // forma legacy con callback
+      setPidiendo(true);
+      if (p && typeof p.then === "function") p.then(aplicar, () => aplicar());
+    } catch (_) {
+      aplicar();
+    }
+  }
+
+  // Manda la notificación por el mismo camino que el timer real (service
+  // worker + setTimeout) para probar la cadena completa, no sólo el permiso.
+  async function probar() {
+    setPrueba("idle");
+    try {
+      if (!("serviceWorker" in navigator)) { setPrueba("sin-sw"); return; }
+      const existe = await navigator.serviceWorker.getRegistration();
+      if (!existe) { setPrueba("sin-sw"); return; }
+      const reg = await navigator.serviceWorker.ready;
+      if (!reg.active) { setPrueba("error"); return; }
+      reg.active.postMessage({
+        type: "SCHEDULE_NOTIFICATION",
+        tag: "prueba-notif",
+        title: "Prueba de notificación",
+        body: "Si ves esto, el aviso de fin de descanso te va a llegar.",
+        timestamp: Date.now() + 5000,
+      });
+      setPrueba("enviada");
+    } catch (_) {
+      setPrueba("error");
+    }
+  }
+
+  const mensajePrueba = {
+    enviada: "Listo — bloqueá la pantalla ahora. En 5 segundos tiene que sonar.",
+    "sin-sw": "No hay service worker activo. Recargá la app y probá de nuevo.",
+    error: "No se pudo enviar la prueba.",
+  }[prueba];
+
+  return (
+    <div style={{ marginTop: 36, paddingTop: 24, borderTop: `1px solid ${C.linea}` }}>
+      <div style={{ fontFamily: SANS, fontSize: 16, fontWeight: 700, color: C.hueso, marginBottom: 16 }}>
+        Notificaciones
+      </div>
+
+      {!soportado && (
+        <div style={{ fontFamily: SANS, fontSize: 13, color: C.gris, lineHeight: 1.5 }}>
+          {esStandalone()
+            ? "Este dispositivo no soporta notificaciones web."
+            : "En iOS las notificaciones sólo funcionan con la app instalada. Tocá Compartir → Agregar a inicio, y abrila desde el ícono de la pantalla de inicio."}
+        </div>
+      )}
+
+      {soportado && permiso === "default" && (
+        <>
+          <div style={{ fontFamily: SANS, fontSize: 13, color: C.gris, lineHeight: 1.5, marginBottom: 14 }}>
+            Te avisamos cuando termina el descanso, aunque tengas la pantalla apagada o
+            estés en otra app. iOS te va a preguntar si permitís las notificaciones:
+            tocá <span style={{ color: C.hueso }}>Permitir</span>. Si tocás
+            "No permitir" no se puede volver a pedir desde acá.
+          </div>
+          <Boton
+            tono={pidiendo ? "neutro" : "fuerte"}
+            alto={48}
+            onClick={activar}
+            style={{ opacity: pidiendo ? 0.5 : 1 }}
+          >
+            {pidiendo ? "Esperando…" : "Activar notificaciones"}
+          </Boton>
+        </>
+      )}
+
+      {soportado && permiso === "granted" && (
+        <>
+          <div style={{ fontFamily: SANS, fontSize: 13, color: C.verde, marginBottom: 14 }}>
+            Activadas. Vas a recibir el aviso al terminar cada descanso.
+          </div>
+          <Boton tono="fantasma" alto={48} onClick={probar}>
+            Probar (llega en 5 segundos)
+          </Boton>
+          {mensajePrueba && (
+            <div
+              style={{
+                marginTop: 10,
+                fontFamily: SANS,
+                fontSize: 13,
+                lineHeight: 1.5,
+                color: prueba === "enviada" ? C.verde : C.oxido,
+              }}
+            >
+              {mensajePrueba}
+            </div>
+          )}
+        </>
+      )}
+
+      {soportado && permiso === "denied" && (
+        <div style={{ fontFamily: SANS, fontSize: 13, color: C.gris, lineHeight: 1.5 }}>
+          <div style={{ color: C.oxido, marginBottom: 8 }}>Bloqueadas.</div>
+          iOS no deja volver a pedirlas desde la app: hay que habilitarlas a mano en{" "}
+          <span style={{ color: C.hueso }}>
+            Ajustes del iPhone → Notificaciones → Gym → Permitir notificaciones
+          </span>
+          . Después volvé acá y el estado se actualiza solo.
+          <div style={{ marginTop: 8 }}>
+            No borres ni reinstales la app para resetear el permiso: se pierde todo el
+            historial guardado en el teléfono.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function VersionPanel() {
+  const [estado, setEstado] = useState("idle"); // idle | buscando | al-dia | actualizando | error | sin-sw
+  const cargando = estado === "buscando";
+
+  async function buscarActualizaciones() {
+    setEstado("buscando");
+    try {
+      if (!("serviceWorker" in navigator)) { setEstado("sin-sw"); return; }
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (!reg) { setEstado("sin-sw"); return; }
+      await reg.update();
+      // el fetch de reg.update() puede resolver antes de que el SW nuevo
+      // termine de instalarse y quede "waiting" — le damos un margen corto.
+      for (let i = 0; i < 10 && !reg.waiting; i++) {
+        await new Promise((r) => setTimeout(r, 400));
+      }
+      if (reg.waiting) {
+        reg.waiting.postMessage({ type: "SKIP_WAITING" });
+        setEstado("actualizando");
+      } else {
+        setEstado("al-dia");
+      }
+    } catch (e) {
+      setEstado("error");
+    }
+  }
+
+  const mensaje = {
+    "al-dia": "Ya tenés la última versión.",
+    actualizando: "Hay una versión nueva — actualizando, la app se va a recargar sola.",
+    error: "No se pudo chequear. Probá de nuevo.",
+    "sin-sw": "Esta vista previa no tiene actualización automática disponible.",
+  }[estado];
+
+  return (
+    <div style={{ marginTop: 36, paddingTop: 24, borderTop: `1px solid ${C.linea}` }}>
+      <div style={{ fontFamily: SANS, fontSize: 16, fontWeight: 700, color: C.hueso, marginBottom: 16 }}>
+        Versión
+      </div>
+      <div style={{ fontFamily: MONO, fontSize: 12, color: C.gris, marginBottom: 12 }}>
+        Instalada: <span style={{ color: C.hueso }}>v{version}</span>
+      </div>
+      <Boton
+        tono={cargando ? "neutro" : "fantasma"}
+        alto={48}
+        onClick={buscarActualizaciones}
+        style={{ opacity: cargando ? 0.5 : 1 }}
+      >
+        {cargando ? "Buscando…" : "Buscar actualizaciones"}
+      </Boton>
+      {mensaje && (
+        <div style={{ marginTop: 10, fontFamily: SANS, fontSize: 13, color: estado === "error" ? C.oxido : C.verde }}>
+          {mensaje}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SelectorFusionDia({ dia, candidatos, onConfirmar, volver }) {
+  const [elegido, setElegido] = useState(null);
+
+  if (elegido) {
+    return (
+      <Marco>
+        <Cabecera izq="Fusionar días" onSalir={() => setElegido(null)} />
+        <div style={{ padding: "8px 20px 40px" }}>
+          <div style={{ padding: "14px 16px", background: "#2a1a1a", border: `1px solid #3a2a2a`, borderRadius: 6 }}>
+            <div style={{ fontFamily: SANS, fontSize: 14, color: C.hueso, lineHeight: 1.5 }}>
+              Se va a fusionar <strong>"{elegido.nombre}"</strong> con <strong>"{dia.nombre}"</strong>.
+              Los ejercicios de ambos quedan juntos bajo <strong>"{dia.nombre}"</strong> y "{elegido.nombre}"
+              desaparece. Los que ya compartían los dos días no se duplican. No se puede deshacer.
+            </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+              <button onClick={() => setElegido(null)} style={CONFIRM_BTN}>Cancelar</button>
+              <button
+                onClick={() => onConfirmar(elegido.id)}
+                style={{ ...CONFIRM_BTN, color: "#c0392b", borderColor: "#3a2a2a" }}
+              >
+                Sí, fusionar
+              </button>
+            </div>
+          </div>
+        </div>
+      </Marco>
+    );
+  }
+
+  return (
+    <Marco>
+      <Cabecera izq="Fusionar con..." onSalir={volver} />
+      <div style={{ padding: "8px 20px 40px" }}>
+        {candidatos.length === 0 ? (
+          <p style={{ fontFamily: SANS, color: C.gris, fontSize: 14, marginTop: 20, lineHeight: 1.5 }}>
+            No hay otro día para fusionar.
+          </p>
+        ) : (
+          <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 8 }}>
+            {candidatos.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => setElegido(c)}
+                style={{ width: "100%", textAlign: "left", background: C.sup, border: `1px solid ${C.linea}`, borderRadius: 6, padding: "14px 16px", cursor: "pointer", WebkitTapHighlightColor: "transparent" }}
+              >
+                <div style={{ fontFamily: SANS, fontSize: 16, fontWeight: 600, color: C.hueso }}>{c.nombre}</div>
+                <div style={{ fontFamily: MONO, fontSize: 12, color: C.gris, marginTop: 4 }}>
+                  {c.ejercicios.length} ejercicio{c.ejercicios.length !== 1 ? "s" : ""}
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+        <div style={{ marginTop: 20 }}>
+          <Boton tono="fantasma" alto={54} onClick={volver}>Cancelar</Boton>
+        </div>
+      </div>
+    </Marco>
+  );
+}
+
 /* ── pantalla principal ── */
 
 // Campos compartidos entre copias del mismo ejercicio en distintos días —
 // ver actualizarCompartido en domain/rutina.js.
-const CAMPOS_COMPARTIDOS = new Set(["nombre", "peso", "incremento", "repsObjetivo", "duracionObjetivo"]);
+const CAMPOS_COMPARTIDOS = new Set(["nombre", "peso", "incremento", "repsObjetivo", "duracionObjetivo", "tecnica", "imagenUrl"]);
 
-export function Ajustes({ dias, setDias, agregarEjercicioADia, traerHistorialDeHC, aplicarRutinaDeHC, volver }) {
+export function Ajustes({ dias, setDias, agregarEjercicioADia, traerHistorialDeHC, aplicarRutinaDeHC, onImportarRutina, volver }) {
   const [agregandoEnDia, setAgregandoEnDia] = useState(null);
   const [confirmandoQuitarDia, setConfirmandoQuitarDia] = useState(null);
+  const [fusionandoDia, setFusionandoDia] = useState(null);
+  const [creandoEjercicio, setCreandoEjercicio] = useState(false);
   // Colapsado por default (la lista de días se hace larga); un día recién
   // creado se abre solo, para poder cargarle ejercicios sin un tap extra.
   const [colapsados, setColapsados] = useState({});
@@ -725,6 +1318,8 @@ export function Ajustes({ dias, setDias, agregarEjercicioADia, traerHistorialDeH
     setDias(dias.map((d) =>
       d.id !== diaId ? d : { ...d, ejercicios: d.ejercicios.filter((e) => e.id !== ejId) }
     ));
+
+  const eliminarEjercicioCompleto = (ejId) => setDias(eliminarEjercicioDeTodos(dias, ejId));
 
   const moverEjercicio = (diaOrigenId, ejId, diaDestinoId) => {
     const ej = dias.find((d) => d.id === diaOrigenId)?.ejercicios.find((e) => e.id === ejId);
@@ -755,6 +1350,21 @@ export function Ajustes({ dias, setDias, agregarEjercicioADia, traerHistorialDeH
   // qué tan fuerte es el aviso.
   const intentarQuitarDia = (diaId) => setConfirmandoQuitarDia(diaId);
 
+  if (fusionandoDia) {
+    const dia = dias.find((d) => d.id === fusionandoDia);
+    return (
+      <SelectorFusionDia
+        dia={dia}
+        candidatos={dias.filter((d) => d.id !== fusionandoDia)}
+        onConfirmar={(otroId) => {
+          setDias(fusionarDias(dias, fusionandoDia, otroId));
+          setFusionandoDia(null);
+        }}
+        volver={() => setFusionandoDia(null)}
+      />
+    );
+  }
+
   if (agregandoEnDia) {
     return (
       <SelectorEjercicio
@@ -769,6 +1379,33 @@ export function Ajustes({ dias, setDias, agregarEjercicioADia, traerHistorialDeH
         }}
         volver={() => setAgregandoEnDia(null)}
       />
+    );
+  }
+
+  if (creandoEjercicio) {
+    return (
+      <Marco>
+        <Cabecera izq="¿A qué día lo agregás?" onSalir={() => setCreandoEjercicio(false)} />
+        <div style={{ padding: "8px 20px 40px" }}>
+          <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 8 }}>
+            {dias.map((d) => (
+              <button
+                key={d.id}
+                onClick={() => { setCreandoEjercicio(false); setAgregandoEnDia(d.id); }}
+                style={{ width: "100%", textAlign: "left", background: C.sup, border: `1px solid ${C.linea}`, borderRadius: 6, padding: "14px 16px", cursor: "pointer", WebkitTapHighlightColor: "transparent" }}
+              >
+                <div style={{ fontFamily: SANS, fontSize: 16, fontWeight: 600, color: C.hueso }}>{d.nombre}</div>
+                <div style={{ fontFamily: MONO, fontSize: 12, color: C.gris, marginTop: 4 }}>
+                  {d.ejercicios.length} ejercicio{d.ejercicios.length !== 1 ? "s" : ""}
+                </div>
+              </button>
+            ))}
+          </div>
+          <div style={{ marginTop: 20 }}>
+            <Boton tono="fantasma" alto={54} onClick={() => setCreandoEjercicio(false)}>Cancelar</Boton>
+          </div>
+        </div>
+      </Marco>
     );
   }
 
@@ -860,6 +1497,15 @@ export function Ajustes({ dias, setDias, agregarEjercicioADia, traerHistorialDeH
                 >
                   + Agregar ejercicio
                 </button>
+
+                {dias.length > 1 && (
+                  <button
+                    onClick={() => setFusionandoDia(d.id)}
+                    style={{ width: "100%", marginTop: 8, background: "none", border: `1px dashed ${C.linea}`, borderRadius: 6, color: C.gris, fontFamily: SANS, fontSize: 14, padding: "13px 0", cursor: "pointer" }}
+                  >
+                    Fusionar con otro día...
+                  </button>
+                )}
               </>
             )}
           </div>
@@ -873,11 +1519,27 @@ export function Ajustes({ dias, setDias, agregarEjercicioADia, traerHistorialDeH
           + Agregar día
         </button>
 
+        <PanelEjercicios
+          dias={dias}
+          editar={editar}
+          quitarEjercicio={quitarEjercicio}
+          moverEjercicio={moverEjercicio}
+          moverOrden={moverOrden}
+          onEliminar={eliminarEjercicioCompleto}
+          onCrear={() => setCreandoEjercicio(true)}
+        />
+
+        <PanelCompartir dias={dias} onImportar={onImportarRutina} />
+
         <SyncPanel
           dias={dias}
           traerHistorialDeHC={traerHistorialDeHC}
           aplicarRutinaDeHC={aplicarRutinaDeHC}
         />
+
+        <NotificacionesPanel />
+
+        <VersionPanel />
 
         <div style={{ marginTop: 28 }}>
           <Boton tono="fuerte" alto={54} onClick={volver}>

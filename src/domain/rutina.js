@@ -48,7 +48,7 @@ export const ejercicioTiempo = (nombre, duracionObjetivo = 30, series = 3, desca
 // mantienen sincronizados entre copias. Series/reps/descanso (o
 // duración/distancia en cardio) quedan libres para variar por día.
 
-const CAMPOS_COMPARTIDOS = ["id", "tipo", "nombre", "peso", "incremento", "repsObjetivo", "duracionObjetivo", "ajustes", "historial"];
+const CAMPOS_COMPARTIDOS = ["id", "tipo", "nombre", "peso", "incremento", "repsObjetivo", "duracionObjetivo", "ajustes", "historial", "tecnica", "imagenUrl"];
 
 function camposCompartidos(ej) {
   const out = {};
@@ -68,6 +68,31 @@ export function quitarPierdeHistorial(dias, id) {
   const ej = dias.flatMap((d) => d.ejercicios).find((e) => e.id === id);
   if (!ej?.historial?.length) return false;
   return diasDondeAparece(dias, id).length === 1;
+}
+
+// Aproximación de "última vez" para días que todavía no tienen `ultimaSesion`
+// propio (ver más abajo) — sólo se usa como fallback de migración para
+// historial cargado antes de que existiera ese campo. Ignora los ejercicios
+// compartidos con otro día porque su historial se sincroniza sin importar
+// bajo cuál día se lo entrenó; si el día no tiene ningún ejercicio
+// exclusivo (p.ej. todos sus ejercicios están vinculados a otros días),
+// no queda otra que aproximar con el conjunto completo.
+export function ultimaFechaDia(dias, diaId) {
+  const dia = dias.find((d) => d.id === diaId);
+  if (!dia) return null;
+  const propios = dia.ejercicios.filter((e) => diasDondeAparece(dias, e.id).length === 1);
+  const fuente = propios.length > 0 ? propios : dia.ejercicios;
+  const fechas = fuente.flatMap((e) => e.historial.map((h) => h.fecha)).sort();
+  return fechas[fechas.length - 1] ?? null;
+}
+
+// Marca la fecha en la que se entrenó este día en concreto, en un campo
+// propio del día (`ultimaSesion`) — independiente del historial de sus
+// ejercicios, que puede estar compartido con otros días y por lo tanto no
+// sirve para saber cuándo se entrenó ESTE día. Se llama cada vez que se
+// guarda una serie/registro real durante una sesión (ver App.jsx).
+export function marcarSesionDia(dias, diaId, fecha) {
+  return dias.map((d) => (d.id === diaId ? { ...d, ultimaSesion: fecha } : d));
 }
 
 // ── días ────────────────────────────────────────────────────────
@@ -108,13 +133,35 @@ export function actualizarCompartido(dias, id, cambios) {
   }));
 }
 
+// Borra el ejercicio de todo día donde aparezca (todas las copias
+// compartidas), historial incluido. A diferencia de quitarlo de un solo
+// día, esto siempre se lleva puesto el historial completo.
+export function eliminarEjercicioDeTodos(dias, id) {
+  return dias.map((d) => ({ ...d, ejercicios: d.ejercicios.filter((e) => e.id !== id) }));
+}
+
 // ── edición de historial ───────────────────────────────────────
 
-// Reemplaza la entrada con la misma fecha si ya existe (evita duplicados
-// cuando el mismo ejercicio se cierra dos veces el mismo día, p.ej. por
-// estar vinculado a dos días entrenados la misma fecha); si no, la agrega.
+// Agrega una entrada al historial. Si ya hay una entrada para esa fecha
+// (p.ej. se entrenó el mismo ejercicio dos veces en el día — mañana y
+// tarde, o porque está vinculado a dos días entrenados la misma fecha),
+// se fusiona con la existente en vez de reemplazarla, para que ambas
+// sesiones del día queden juntas bajo una sola entrada.
 export function agregarEntradaHistorial(historial, entrada) {
-  return [...historial.filter((h) => h.fecha !== entrada.fecha), entrada].slice(-40);
+  const existente = historial.find((h) => h.fecha === entrada.fecha);
+  const fusionada = !existente
+    ? entrada
+    : entrada.series
+    ? { ...entrada, series: [...(existente.series ?? []), ...entrada.series] }
+    : {
+        ...entrada,
+        duracion: (existente.duracion ?? 0) + (entrada.duracion ?? 0),
+        distancia:
+          existente.distancia != null || entrada.distancia != null
+            ? (existente.distancia ?? 0) + (entrada.distancia ?? 0)
+            : null,
+      };
+  return [...historial.filter((h) => h.fecha !== entrada.fecha), fusionada].slice(-40);
 }
 
 // Edita una entrada existente de `historial` (ubicada por fecha original) y
@@ -224,6 +271,93 @@ export function resincronizarCompartidos(dias) {
     ...d,
     ejercicios: d.ejercicios.map((e) => (mergeados[e.id] ? { ...e, ...mergeados[e.id] } : e)),
   }));
+}
+
+// Candidatos para fusionar con `ejId`: cualquier otro ejercicio, en cualquier
+// día (a diferencia de ejerciciosVinculables, acá no importa en qué día está
+// `ejId`), del mismo tipo, deduplicado por id.
+export function ejerciciosFusionables(dias, ejId) {
+  const actual = dias.flatMap((d) => d.ejercicios).find((e) => e.id === ejId);
+  if (!actual) return [];
+  const vistos = new Set([ejId]);
+  const resultado = [];
+  dias.forEach((d) => {
+    d.ejercicios.forEach((e) => {
+      if (e.tipo !== actual.tipo || vistos.has(e.id)) return;
+      vistos.add(e.id);
+      resultado.push({ ...e, diasDonde: diasDondeAparece(dias, e.id) });
+    });
+  });
+  return resultado;
+}
+
+// Fusiona dos ejercicios que son el mismo movimiento real bajo identidades
+// separadas (p.ej. tipeados con nombres distintos en días distintos). El
+// sobreviviente (idSuperviviente) conserva su nombre; toda copia de
+// idPerdedor, en cualquier día, pasa a tener su id y nombre. El historial de
+// ambos se une igual que resincronizarCompartidos (dedupe por fecha, orden
+// ascendente, recorte a 40); peso/repsObjetivo/incremento/ajustes (o
+// duracionObjetivo/incremento) se toman de la copia con historial más
+// reciente — empate a favor del sobreviviente. Los campos propios de cada
+// día (series/repsMin/repsMax/descanso, o duracionMin/distanciaKm) no se
+// tocan. No-op si falta algún id o si los tipos no coinciden.
+export function fusionarEjercicios(dias, idSuperviviente, idPerdedor) {
+  if (idSuperviviente === idPerdedor) return dias;
+  const todos = dias.flatMap((d) => d.ejercicios);
+  const superviviente = todos.find((e) => e.id === idSuperviviente);
+  const perdedor = todos.find((e) => e.id === idPerdedor);
+  if (!superviviente || !perdedor) return dias;
+  if (superviviente.tipo !== perdedor.tipo) return dias;
+
+  const porFecha = new Map();
+  [...(superviviente.historial ?? []), ...(perdedor.historial ?? [])].forEach((h) => porFecha.set(h.fecha, h));
+  const historial = [...porFecha.values()].sort((a, b) => a.fecha.localeCompare(b.fecha)).slice(-40);
+
+  const fSuperviviente = superviviente.historial?.[superviviente.historial.length - 1]?.fecha ?? "";
+  const fPerdedor = perdedor.historial?.[perdedor.historial.length - 1]?.fecha ?? "";
+  const masReciente = fPerdedor > fSuperviviente ? perdedor : superviviente;
+
+  const camposFusionados =
+    superviviente.tipo === "cardio"
+      ? { historial }
+      : superviviente.tipo === "tiempo"
+      ? { historial, duracionObjetivo: masReciente.duracionObjetivo, incremento: masReciente.incremento }
+      : {
+          historial,
+          peso: masReciente.peso,
+          repsObjetivo: masReciente.repsObjetivo,
+          incremento: masReciente.incremento,
+          ajustes: masReciente.ajustes,
+        };
+
+  return dias.map((d) => ({
+    ...d,
+    ejercicios: d.ejercicios.map((e) => {
+      if (e.id === idPerdedor) return { ...e, ...camposFusionados, id: idSuperviviente, nombre: superviviente.nombre };
+      if (e.id === idSuperviviente) return { ...e, ...camposFusionados };
+      return e;
+    }),
+  }));
+}
+
+// Fusiona dos días: el sobreviviente conserva su id y nombre; los
+// ejercicios del perdedor se agregan a su lista (sin duplicar los que ya
+// comparte, por id, con el sobreviviente), y el perdedor desaparece de
+// `dias`. No hay nada que hacer con historial — vive en cada ejercicio, no
+// en el día, así que viaja solo junto con cada uno. No-op si falta algún
+// id o si son el mismo día.
+export function fusionarDias(dias, idSuperviviente, idPerdedor) {
+  if (idSuperviviente === idPerdedor) return dias;
+  const superviviente = dias.find((d) => d.id === idSuperviviente);
+  const perdedor = dias.find((d) => d.id === idPerdedor);
+  if (!superviviente || !perdedor) return dias;
+
+  const idsExistentes = new Set(superviviente.ejercicios.map((e) => e.id));
+  const ejerciciosAAgregar = perdedor.ejercicios.filter((e) => !idsExistentes.has(e.id));
+
+  return dias
+    .filter((d) => d.id !== idPerdedor)
+    .map((d) => (d.id === idSuperviviente ? { ...d, ejercicios: [...d.ejercicios, ...ejerciciosAAgregar] } : d));
 }
 
 export const RUTINA_INICIAL = [

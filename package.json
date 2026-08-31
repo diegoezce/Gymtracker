@@ -1,7 +1,7 @@
 {
   "name": "gymtracker",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.15",
   "type": "module",
   "engines": {
     "node": ">=20"
@@ -21,6 +21,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
+    "sharp": "^0.35.3",
     "vite": "^5.4.11",
     "vite-plugin-pwa": "^0.21.1",
     "vitest": "^2.1.8"

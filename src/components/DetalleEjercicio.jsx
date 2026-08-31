@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { C, MONO, SANS } from "../theme";
 import { fmt } from "../utils/format";
+import { ejerciciosFusionables } from "../domain/rutina";
 import { Marco } from "./Marco";
 import { Cabecera } from "./Cabecera";
 import { Boton } from "./Boton";
@@ -84,6 +85,17 @@ const QUITAR_SERIE_BTN = {
   height: 34,
   flexShrink: 0,
   cursor: "pointer",
+};
+
+const TARJETA_FUSION = {
+  width: "100%",
+  textAlign: "left",
+  background: C.sup,
+  border: `1px solid ${C.linea}`,
+  borderRadius: 6,
+  padding: "14px 16px",
+  cursor: "pointer",
+  WebkitTapHighlightColor: "transparent",
 };
 
 function resumenEntrada(tipo, h) {
@@ -232,8 +244,80 @@ function FilaHistorial({ tipo, entrada, onEditar, onEliminar }) {
   );
 }
 
-export function DetalleEjercicio({ ejercicio, onEditar, onEliminar, volver }) {
+function SelectorFusion({ ejercicio, candidatos, onConfirmar, volver }) {
+  const [elegido, setElegido] = useState(null);
+
+  if (elegido) {
+    return (
+      <Marco>
+        <Cabecera izq="Fusionar ejercicios" onSalir={() => setElegido(null)} />
+        <div style={{ padding: "8px 20px 40px" }}>
+          <div style={{ padding: "14px 16px", background: "#2a1a1a", border: `1px solid #3a2a2a`, borderRadius: 6 }}>
+            <div style={{ fontFamily: SANS, fontSize: 14, color: C.hueso, lineHeight: 1.5 }}>
+              Se va a fusionar <strong>"{elegido.nombre}"</strong> con <strong>"{ejercicio.nombre}"</strong>.
+              El historial de ambos se une y de acá en más todo va a quedar registrado como{" "}
+              <strong>"{ejercicio.nombre}"</strong>. No se puede deshacer.
+            </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+              <button onClick={() => setElegido(null)} style={SMALL_BTN}>Cancelar</button>
+              <button
+                onClick={() => onConfirmar(elegido.id)}
+                style={{ ...SMALL_BTN, color: DANGER, borderColor: "#3a2a2a" }}
+              >
+                Sí, fusionar
+              </button>
+            </div>
+          </div>
+        </div>
+      </Marco>
+    );
+  }
+
+  return (
+    <Marco>
+      <Cabecera izq="Fusionar con..." onSalir={volver} />
+      <div style={{ padding: "8px 20px 40px" }}>
+        {candidatos.length === 0 ? (
+          <p style={{ fontFamily: SANS, color: C.gris, fontSize: 14, marginTop: 20, lineHeight: 1.5 }}>
+            No hay otros ejercicios del mismo tipo todavía para fusionar.
+          </p>
+        ) : (
+          <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 8 }}>
+            {candidatos.map((c) => (
+              <button key={c.id} onClick={() => setElegido(c)} style={TARJETA_FUSION}>
+                <div style={{ fontFamily: SANS, fontSize: 16, fontWeight: 600, color: C.hueso }}>{c.nombre}</div>
+                <div style={{ fontFamily: MONO, fontSize: 12, color: C.gris, marginTop: 4 }}>
+                  también en {c.diasDonde.join(", ")}
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+        <div style={{ marginTop: 20 }}>
+          <Boton tono="fantasma" alto={54} onClick={volver}>Cancelar</Boton>
+        </div>
+      </div>
+    </Marco>
+  );
+}
+
+export function DetalleEjercicio({ ejercicio, dias, onEditar, onEliminar, onFusionar, volver }) {
+  const [fusionando, setFusionando] = useState(false);
   const historialDesc = [...ejercicio.historial].sort((a, b) => b.fecha.localeCompare(a.fecha));
+
+  if (fusionando) {
+    return (
+      <SelectorFusion
+        ejercicio={ejercicio}
+        candidatos={ejerciciosFusionables(dias, ejercicio.id)}
+        onConfirmar={(otroId) => {
+          onFusionar(otroId);
+          setFusionando(false);
+        }}
+        volver={() => setFusionando(false)}
+      />
+    );
+  }
 
   return (
     <Marco>
@@ -255,6 +339,12 @@ export function DetalleEjercicio({ ejercicio, onEditar, onEliminar, volver }) {
         ))}
 
         <div style={{ marginTop: 20 }}>
+          <Boton tono="fantasma" alto={48} onClick={() => setFusionando(true)}>
+            Fusionar con otro ejercicio...
+          </Boton>
+        </div>
+
+        <div style={{ marginTop: 12 }}>
           <Boton tono="fantasma" alto={54} onClick={volver}>
             Volver
           </Boton>

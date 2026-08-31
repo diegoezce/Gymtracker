@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { storage, CLAVE_RUTINA } from "./storage";
-import { RUTINA_INICIAL, actualizarCompartido, vincularEjercicio, resincronizarCompartidos, agregarEntradaHistorial, editarEntradaHistorial, eliminarEntradaHistorial } from "./domain/rutina";
+import { storage, CLAVE_RUTINA, CLAVE_SESION } from "./storage";
+import { RUTINA_INICIAL, actualizarCompartido, vincularEjercicio, resincronizarCompartidos, agregarEntradaHistorial, editarEntradaHistorial, eliminarEntradaHistorial, fusionarEjercicios, marcarSesionDia } from "./domain/rutina";
 import { leerToken, leerAutoSync, fetchSesiones, aplicarSesiones, pushSesiones, construirSesiones, fetchRutina, aplicarRutina, SYNC_KEY, TOKEN_KEY } from "./sync/hcAdapter";
 import { progresar, aprender } from "./domain/progression";
 import { hoy } from "./utils/format";
@@ -18,6 +18,7 @@ export default function App() {
   const [dias, setDias] = useState(RUTINA_INICIAL);
   const [pantalla, setPantalla] = useState("inicio");
   const [sesion, setSesion] = useState(null);
+  const [sesionPausada, setSesionPausada] = useState(false);
   const [aviso, setAviso] = useState("");
   const [preguntaSync, setPreguntaSync] = useState(null);
   const primeraCarga = useRef(true);
@@ -46,6 +47,10 @@ export default function App() {
           }
         }
       } catch (e) {}
+      try {
+        const s = await storage.get(CLAVE_SESION);
+        if (s?.value) setSesion(JSON.parse(s.value));
+      } catch (e) {}
       setCargando(false);
     })();
   }, []);
@@ -64,6 +69,15 @@ export default function App() {
       }
     })();
   }, [dias, cargando]);
+
+  useEffect(() => {
+    if (cargando) return;
+    (async () => {
+      try {
+        await storage.set(CLAVE_SESION, sesion === null ? "" : JSON.stringify(sesion));
+      } catch (e) {}
+    })();
+  }, [sesion, cargando]);
 
   if (cargando)
     return (
@@ -84,14 +98,26 @@ export default function App() {
   // que sólo sale desde el botón explícito de Ajustes. Auto-sync cubre las
   // sesiones, que son aditivas.
 
-  // sesion = { diaId, ejIdx: null | number, pesoActual, series, hechos, saltados }
+  // sesion = { diaId, ejIdx: null | number, pesoActual, series, hechos, progreso, saltados, extra }
   // ejIdx null → menú del día; number → ejercicio en curso
   // saltados vive sólo acá: saltear es "hoy no lo hago", no toca la rutina
+  // extra vive sólo acá también: series de más que el usuario pide en el
+  // momento, no toca ej.series (la plantilla) — ver agregarSerieExtra
 
   const comenzar = (dia) => {
     setAviso("");
-    setSesion({ diaId: dia.id, ejIdx: null, pesoActual: 0, series: [], hechos: {}, progreso: {}, saltados: {} });
+    setSesionPausada(false);
+    setSesion({ diaId: dia.id, ejIdx: null, pesoActual: 0, series: [], hechos: {}, progreso: {}, saltados: {}, extra: {} });
   };
+
+  // Pausar: vuelve a Inicio sin tocar la sesión — queda intacta (en memoria
+  // y persistida) para retomarla. No escribe nada en `dias`/historial.
+  const pausarSesion = () => setSesionPausada(true);
+  const reanudarSesion = () => setSesionPausada(false);
+
+  // Empezar un día distinto al que está en pausa descarta lo no guardado de
+  // ese otro (nunca llegó a `dias`, sólo vivía en `sesion.progreso`).
+  const descartarYEmpezar = (diaNuevo) => comenzar(diaNuevo);
 
   const dia = sesion ? dias.find((d) => d.id === sesion.diaId) : null;
   const ej = dia && sesion.ejIdx !== null ? dia.ejercicios[sesion.ejIdx] : null;
@@ -108,17 +134,26 @@ export default function App() {
   };
 
   const guardarCardio = (duracion, distancia) => {
-    const nuevos = actualizarCompartido(dias, ej.id, {
+    let nuevos = actualizarCompartido(dias, ej.id, {
       historial: agregarEntradaHistorial(ej.historial, { fecha: hoy(), duracion, distancia }),
     });
+    nuevos = marcarSesionDia(nuevos, dia.id, hoy());
     setDias(nuevos);
     syncSilencioso(nuevos);
     setSesion({ ...sesion, ejIdx: null, series: [], hechos: { ...sesion.hechos, [ej.id]: true } });
   };
 
+  // Serie extra = "puedo una más, ahora". Sólo estado de sesión — ej.series
+  // (la plantilla) no cambia, así que no se comparte ni persiste al día siguiente.
+  const agregarSerieExtra = () => {
+    const extra = { ...sesion.extra, [ej.id]: (sesion.extra?.[ej.id] ?? 0) + 1 };
+    setSesion({ ...sesion, extra });
+  };
+
   const guardarSerie = (reps, rir) => {
     const series = [...sesion.series, { peso: sesion.pesoActual, reps, rir }];
-    if (series.length < ej.series) {
+    const objetivoSeries = ej.series + (sesion.extra?.[ej.id] ?? 0);
+    if (series.length < objetivoSeries) {
       setSesion({ ...sesion, series });
       return;
     }
@@ -128,13 +163,14 @@ export default function App() {
   const cerrarEjercicio = (series) => {
     const { peso, repsObjetivo, nota } = progresar(ej, series);
     const { ajustes, incremento, aviso: av } = aprender(ej, series[0].peso);
-    const nuevos = actualizarCompartido(dias, ej.id, {
+    let nuevos = actualizarCompartido(dias, ej.id, {
       peso,
       repsObjetivo,
       incremento,
       ajustes,
       historial: agregarEntradaHistorial(ej.historial, { fecha: hoy(), series }),
     });
+    nuevos = marcarSesionDia(nuevos, dia.id, hoy());
     setDias(nuevos);
     setAviso(av || nota);
     syncSilencioso(nuevos);
@@ -143,7 +179,8 @@ export default function App() {
 
   const guardarSerieTiempo = (segundos) => {
     const series = [...sesion.series, { segundos }];
-    if (series.length < ej.series) {
+    const objetivoSeries = ej.series + (sesion.extra?.[ej.id] ?? 0);
+    if (series.length < objetivoSeries) {
       setSesion({ ...sesion, series });
       return;
     }
@@ -152,10 +189,11 @@ export default function App() {
 
   const cerrarEjercicioTiempo = (series) => {
     const { duracionObjetivo, nota } = progresar(ej, series);
-    const nuevos = actualizarCompartido(dias, ej.id, {
+    let nuevos = actualizarCompartido(dias, ej.id, {
       duracionObjetivo,
       historial: agregarEntradaHistorial(ej.historial, { fecha: hoy(), series }),
     });
+    nuevos = marcarSesionDia(nuevos, dia.id, hoy());
     setDias(nuevos);
     setAviso(nota);
     syncSilencioso(nuevos);
@@ -197,6 +235,7 @@ export default function App() {
           historial: agregarEntradaHistorial(actual.historial, { fecha: hoy(), series: p.series }),
         });
       });
+      nuevos = marcarSesionDia(nuevos, dia.id, hoy());
       setDias(nuevos);
     }
 
@@ -261,6 +300,12 @@ export default function App() {
     syncSilencioso(nuevos);
   };
 
+  const fusionarHistorial = (idSuperviviente, idPerdedor) => {
+    const nuevos = fusionarEjercicios(dias, idSuperviviente, idPerdedor);
+    setDias(nuevos);
+    syncSilencioso(nuevos);
+  };
+
   // Agrega ejFuente (existente en otro día, o recién creado) a diaId,
   // preservando su id si ya existía en otro lado para que compartan progreso.
   const agregarEjercicioADia = (diaId, ejFuente, configDia = {}) => {
@@ -280,7 +325,7 @@ export default function App() {
     return <ConfirmarSync onSincronizar={confirmarSyncYSalir} onSalirSinSincronizar={salirSinSincronizar} />;
   }
 
-  if (sesion && !ej) {
+  if (sesion && !sesionPausada && !ej) {
     return (
       <DiaMenu
         dia={dia}
@@ -291,12 +336,13 @@ export default function App() {
         onEjercicio={iniciarEjercicio}
         onAlternarSaltado={alternarSaltado}
         onTerminar={salirSesion}
+        onPausar={pausarSesion}
         onAgregarEjercicio={(ejFuente, configDia) => agregarEjercicioADia(dia.id, ejFuente, configDia)}
       />
     );
   }
 
-  if (sesion && ej) {
+  if (sesion && !sesionPausada && ej) {
     return (
       <Sesion
         dia={dia}
@@ -306,6 +352,7 @@ export default function App() {
         guardarSerie={guardarSerie}
         guardarSerieTiempo={guardarSerieTiempo}
         guardarCardio={guardarCardio}
+        agregarSerieExtra={agregarSerieExtra}
         initialTimerFin={sesion.progreso?.[ej.id]?.timerFin ?? null}
         salir={volverAlMenu}
         terminarEjercicio={() =>
@@ -323,6 +370,7 @@ export default function App() {
         agregarEjercicioADia={agregarEjercicioADia}
         traerHistorialDeHC={traerHistorialDeHC}
         aplicarRutinaDeHC={aplicarRutinaDeHC}
+        onImportarRutina={(nuevos) => setDias(resincronizarCompartidos(nuevos))}
         volver={() => setPantalla("inicio")}
       />
     );
@@ -334,6 +382,7 @@ export default function App() {
         volver={() => setPantalla("inicio")}
         onEditarHistorial={editarHistorial}
         onEliminarHistorial={eliminarHistorial}
+        onFusionarHistorial={fusionarHistorial}
       />
     );
 
@@ -341,7 +390,11 @@ export default function App() {
     <Inicio
       dias={dias}
       aviso={aviso}
+      sesion={sesion}
+      sesionPausada={sesionPausada}
       comenzar={comenzar}
+      onReanudar={reanudarSesion}
+      onDescartarYEmpezar={descartarYEmpezar}
       irHistorial={() => setPantalla("historial")}
       irAjustes={() => setPantalla("ajustes")}
     />

@@ -60,9 +60,42 @@ function Grafico({ datos, color = C.sodio }) {
   );
 }
 
+const ORDEN_KEY = "gym:progreso:orden";
+
+function pill(activo) {
+  return {
+    flex: 1,
+    padding: "8px 0",
+    borderRadius: 4,
+    border: `1px solid ${activo ? C.sodio : C.linea}`,
+    background: activo ? C.sodio : "none",
+    color: activo ? "#14120F" : C.gris,
+    fontFamily: SANS,
+    fontSize: 12,
+    fontWeight: 700,
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
+  };
+}
+
 export function Progreso({ dias, volver, onAgregarHistorial, onEditarHistorial, onEliminarHistorial, onFusionarHistorial }) {
   const [detalleId, setDetalleId] = useState(null);
+  const [expandidos, setExpandidos] = useState(new Set());
+  const [orden, setOrden] = useState(() => localStorage.getItem(ORDEN_KEY) ?? "reciente");
   const ahora = new Date();
+
+  const cambiarOrden = (v) => {
+    setOrden(v);
+    localStorage.setItem(ORDEN_KEY, v);
+  };
+
+  const alternarExpandido = (id) =>
+    setExpandidos((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   // Una sesión = una fecha de calendario, sin importar cuántos ejercicios
   // (o días de rutina, si el ejercicio está compartido) se entrenaron ese día.
@@ -94,6 +127,16 @@ export function Progreso({ dias, volver, onAgregarHistorial, onEditarHistorial, 
   // Sin registros: no tienen gráfico que mostrar, pero igual hay que poder
   // entrar para cargar una sesión a mano (p.ej. historial que se perdió).
   const ejerciciosSinHistorial = todosLosEjercicios.filter((e) => e.historial.length === 0);
+
+  // El historial de cada ejercicio siempre queda ordenado por fecha
+  // ascendente (ver agregarEntradaHistorial), así que la última entrada es
+  // la sesión más reciente.
+  const ejerciciosOrdenados = [...ejerciciosConHistorial].sort((a, b) => {
+    if (orden === "alfabetico") return a.nombre.localeCompare(b.nombre);
+    const fechaA = a.historial[a.historial.length - 1].fecha;
+    const fechaB = b.historial[b.historial.length - 1].fecha;
+    return fechaB.localeCompare(fechaA);
+  });
 
   if (detalleId) {
     const ejDetalle = todosLosEjercicios.find((e) => e.id === detalleId);
@@ -153,31 +196,70 @@ export function Progreso({ dias, volver, onAgregarHistorial, onEditarHistorial, 
           </p>
         )}
 
-        {ejerciciosConHistorial.map((e) => {
+        {ejerciciosConHistorial.length > 1 && (
+          <div style={{ display: "flex", gap: 8, marginTop: 24 }}>
+            <button onClick={() => cambiarOrden("reciente")} style={pill(orden === "reciente")}>
+              Más reciente
+            </button>
+            <button onClick={() => cambiarOrden("alfabetico")} style={pill(orden === "alfabetico")}>
+              A-Z
+            </button>
+          </div>
+        )}
+
+        {ejerciciosOrdenados.map((e) => {
           const esCardio = e.tipo === "cardio";
+          const expandido = expandidos.has(e.id);
 
           const cabecera = (
-            <div style={{ marginTop: 30, paddingTop: 22, borderTop: `1px solid ${C.linea}` }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
+            <button
+              onClick={() => alternarExpandido(e.id)}
+              style={{
+                width: "100%",
+                textAlign: "left",
+                background: "none",
+                border: "none",
+                padding: 0,
+                cursor: "pointer",
+                WebkitTapHighlightColor: "transparent",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
                 <div style={{ fontFamily: SANS, fontSize: 16, fontWeight: 700, color: C.hueso }}>{e.nombre}</div>
-                <div style={{ fontFamily: MONO, fontSize: 11, color: C.gris }}>{e.diaNombre}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                  <span style={{ fontFamily: MONO, fontSize: 11, color: C.gris }}>{e.diaNombre}</span>
+                  <span
+                    style={{
+                      display: "inline-block",
+                      color: C.gris,
+                      fontSize: 12,
+                      transition: "transform 0.15s",
+                      transform: expandido ? "rotate(90deg)" : "rotate(0deg)",
+                    }}
+                  >
+                    ›
+                  </span>
+                </div>
               </div>
-              <button
-                onClick={() => setDetalleId(e.id)}
-                style={{
-                  background: "none",
-                  border: "none",
-                  padding: 0,
-                  marginTop: 2,
-                  color: C.sodio,
-                  fontFamily: SANS,
-                  fontSize: 12,
-                  cursor: "pointer",
-                }}
-              >
-                Ver y editar registros →
-              </button>
-            </div>
+            </button>
+          );
+
+          const verYEditar = (
+            <button
+              onClick={() => setDetalleId(e.id)}
+              style={{
+                background: "none",
+                border: "none",
+                padding: 0,
+                marginTop: 10,
+                color: C.sodio,
+                fontFamily: SANS,
+                fontSize: 12,
+                cursor: "pointer",
+              }}
+            >
+              Ver y editar registros →
+            </button>
           );
 
           if (esCardio) {
@@ -189,25 +271,30 @@ export function Progreso({ dias, volver, onAgregarHistorial, onEditarHistorial, 
             const ultima = e.historial[e.historial.length - 1];
 
             return (
-              <div key={e.id}>
+              <div key={e.id} style={{ marginTop: 20, paddingTop: 18, borderTop: `1px solid ${C.linea}` }}>
                 {cabecera}
-                <div style={{ fontFamily: MONO, fontSize: 13, color: C.gris, marginBottom: 14 }}>
+                <div style={{ fontFamily: MONO, fontSize: 13, color: C.gris, marginTop: 4 }}>
                   <span style={{ color: C.sodio, fontWeight: 700 }}>Máx {maxDur} min</span>
                   <span> · {e.historial.length} sesión{e.historial.length !== 1 ? "es" : ""}</span>
                   {ultima && <span> · última {fechaCorta(ultima.fecha)}</span>}
                 </div>
 
-                <Etiqueta>Duración (min)</Etiqueta>
-                <div style={{ marginTop: 8, background: C.sup, border: `1px solid ${C.linea}`, borderRadius: 4, padding: "12px 8px 4px" }}>
-                  <Grafico datos={durData} color={C.sodio} />
-                </div>
-
-                {distData.length > 0 && (
+                {expandido && (
                   <div style={{ marginTop: 14 }}>
-                    <Etiqueta>Distancia (km)</Etiqueta>
+                    <Etiqueta>Duración (min)</Etiqueta>
                     <div style={{ marginTop: 8, background: C.sup, border: `1px solid ${C.linea}`, borderRadius: 4, padding: "12px 8px 4px" }}>
-                      <Grafico datos={distData} color={C.verde} />
+                      <Grafico datos={durData} color={C.sodio} />
                     </div>
+
+                    {distData.length > 0 && (
+                      <div style={{ marginTop: 14 }}>
+                        <Etiqueta>Distancia (km)</Etiqueta>
+                        <div style={{ marginTop: 8, background: C.sup, border: `1px solid ${C.linea}`, borderRadius: 4, padding: "12px 8px 4px" }}>
+                          <Grafico datos={distData} color={C.verde} />
+                        </div>
+                      </div>
+                    )}
+                    {verYEditar}
                   </div>
                 )}
               </div>
@@ -223,18 +310,23 @@ export function Progreso({ dias, volver, onAgregarHistorial, onEditarHistorial, 
             const ultima = e.historial[e.historial.length - 1];
 
             return (
-              <div key={e.id}>
+              <div key={e.id} style={{ marginTop: 20, paddingTop: 18, borderTop: `1px solid ${C.linea}` }}>
                 {cabecera}
-                <div style={{ fontFamily: MONO, fontSize: 13, color: C.gris, marginBottom: 14 }}>
+                <div style={{ fontFamily: MONO, fontSize: 13, color: C.gris, marginTop: 4 }}>
                   <span style={{ color: C.sodio, fontWeight: 700 }}>Máx {maxSeg}s</span>
                   <span> · {e.historial.length} sesión{e.historial.length !== 1 ? "es" : ""}</span>
                   {ultima && <span> · última {fechaCorta(ultima.fecha)}</span>}
                 </div>
 
-                <Etiqueta>Segundos máximos</Etiqueta>
-                <div style={{ marginTop: 8, background: C.sup, border: `1px solid ${C.linea}`, borderRadius: 4, padding: "12px 8px 4px" }}>
-                  <Grafico datos={segData} color={C.sodio} />
-                </div>
+                {expandido && (
+                  <div style={{ marginTop: 14 }}>
+                    <Etiqueta>Segundos máximos</Etiqueta>
+                    <div style={{ marginTop: 8, background: C.sup, border: `1px solid ${C.linea}`, borderRadius: 4, padding: "12px 8px 4px" }}>
+                      <Grafico datos={segData} color={C.sodio} />
+                    </div>
+                    {verYEditar}
+                  </div>
+                )}
               </div>
             );
           }
@@ -253,29 +345,34 @@ export function Progreso({ dias, volver, onAgregarHistorial, onEditarHistorial, 
           const volUltima = volData[volData.length - 1]?.valor ?? 0;
 
           return (
-            <div key={e.id}>
+            <div key={e.id} style={{ marginTop: 20, paddingTop: 18, borderTop: `1px solid ${C.linea}` }}>
               {cabecera}
-              <div style={{ fontFamily: MONO, fontSize: 13, color: C.gris, marginBottom: 14 }}>
+              <div style={{ fontFamily: MONO, fontSize: 13, color: C.gris, marginTop: 4 }}>
                 <span style={{ color: C.sodio, fontWeight: 700 }}>PR {fmt(pr)} kg</span>
                 {prFecha && <span> · {fechaCorta(prFecha)}</span>}
                 <span> · {e.historial.length} sesión{e.historial.length !== 1 ? "es" : ""}</span>
                 {ultima && <span> · última {fechaCorta(ultima.fecha)}</span>}
               </div>
 
-              <Etiqueta>Peso máximo (kg)</Etiqueta>
-              <div style={{ marginTop: 8, background: C.sup, border: `1px solid ${C.linea}`, borderRadius: 4, padding: "12px 8px 4px" }}>
-                <Grafico datos={pesoData} color={C.sodio} />
-              </div>
+              {expandido && (
+                <div style={{ marginTop: 14 }}>
+                  <Etiqueta>Peso máximo (kg)</Etiqueta>
+                  <div style={{ marginTop: 8, background: C.sup, border: `1px solid ${C.linea}`, borderRadius: 4, padding: "12px 8px 4px" }}>
+                    <Grafico datos={pesoData} color={C.sodio} />
+                  </div>
 
-              <div style={{ marginTop: 14 }}>
-                <Etiqueta>Volumen por sesión (tonelaje)</Etiqueta>
-                <div style={{ marginTop: 8, background: C.sup, border: `1px solid ${C.linea}`, borderRadius: 4, padding: "12px 8px 4px" }}>
-                  <Grafico datos={volData} color={C.verde} />
+                  <div style={{ marginTop: 14 }}>
+                    <Etiqueta>Volumen por sesión (tonelaje)</Etiqueta>
+                    <div style={{ marginTop: 8, background: C.sup, border: `1px solid ${C.linea}`, borderRadius: 4, padding: "12px 8px 4px" }}>
+                      <Grafico datos={volData} color={C.verde} />
+                    </div>
+                    <div style={{ fontFamily: MONO, fontSize: 12, color: C.gris, marginTop: 6, textAlign: "right" }}>
+                      Última sesión: <span style={{ color: C.hueso }}>{volUltima.toLocaleString("es-AR")} kg</span>
+                    </div>
+                  </div>
+                  {verYEditar}
                 </div>
-                <div style={{ fontFamily: MONO, fontSize: 12, color: C.gris, marginTop: 6, textAlign: "right" }}>
-                  Última sesión: <span style={{ color: C.hueso }}>{volUltima.toLocaleString("es-AR")} kg</span>
-                </div>
-              </div>
+              )}
             </div>
           );
         })}

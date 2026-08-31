@@ -296,6 +296,19 @@ export default function App() {
     setDias((prev) => resincronizarCompartidos(aplicarRutina(rutina, prev)));
   };
 
+  // Carga manual de una sesión que nunca se registró (o que se perdió).
+  // Va por agregarEntradaHistorial, así que si ya hay una entrada de esa
+  // fecha las series se suman a la existente en vez de reemplazarla.
+  const agregarHistorial = (ejId, entrada) => {
+    const ejActual = dias.flatMap((d) => d.ejercicios).find((e) => e.id === ejId);
+    if (!ejActual) return;
+    const nuevos = actualizarCompartido(dias, ejId, {
+      historial: agregarEntradaHistorial(ejActual.historial ?? [], entrada),
+    });
+    setDias(nuevos);
+    syncSilencioso(nuevos);
+  };
+
   // Corrección manual de un registro viejo (o de hoy) desde Progreso.
   const editarHistorial = (ejId, fechaOriginal, cambios) => {
     const nuevos = editarEntradaHistorial(dias, ejId, fechaOriginal, cambios);
@@ -389,6 +402,7 @@ export default function App() {
       <Progreso
         dias={dias}
         volver={() => setPantalla("inicio")}
+        onAgregarHistorial={agregarHistorial}
         onEditarHistorial={editarHistorial}
         onEliminarHistorial={eliminarHistorial}
         onFusionarHistorial={fusionarHistorial}

@@ -60,7 +60,7 @@ function Grafico({ datos, color = C.sodio }) {
   );
 }
 
-export function Progreso({ dias, volver, onEditarHistorial, onEliminarHistorial, onFusionarHistorial }) {
+export function Progreso({ dias, volver, onAgregarHistorial, onEditarHistorial, onEliminarHistorial, onFusionarHistorial }) {
   const [detalleId, setDetalleId] = useState(null);
   const ahora = new Date();
 
@@ -81,9 +81,8 @@ export function Progreso({ dias, volver, onEditarHistorial, onEliminarHistorial,
 
   // Un ejercicio compartido entre días (mismo id) aparece una sola vez acá.
   const vistos = new Set();
-  const ejerciciosConHistorial = dias.flatMap((d) =>
+  const todosLosEjercicios = dias.flatMap((d) =>
     d.ejercicios
-      .filter((e) => e.historial.length > 0)
       .filter((e) => {
         if (vistos.has(e.id)) return false;
         vistos.add(e.id);
@@ -91,13 +90,18 @@ export function Progreso({ dias, volver, onEditarHistorial, onEliminarHistorial,
       })
       .map((e) => ({ ...e, diaNombre: diasDondeAparece(dias, e.id).join(" · ") }))
   );
+  const ejerciciosConHistorial = todosLosEjercicios.filter((e) => e.historial.length > 0);
+  // Sin registros: no tienen gráfico que mostrar, pero igual hay que poder
+  // entrar para cargar una sesión a mano (p.ej. historial que se perdió).
+  const ejerciciosSinHistorial = todosLosEjercicios.filter((e) => e.historial.length === 0);
 
   if (detalleId) {
-    const ejDetalle = ejerciciosConHistorial.find((e) => e.id === detalleId);
+    const ejDetalle = todosLosEjercicios.find((e) => e.id === detalleId);
     return (
       <DetalleEjercicio
         ejercicio={ejDetalle}
         dias={dias}
+        onAgregar={(entrada) => onAgregarHistorial(ejDetalle.id, entrada)}
         onEditar={(fecha, cambios) => onEditarHistorial(ejDetalle.id, fecha, cambios)}
         onEliminar={(fecha) => onEliminarHistorial(ejDetalle.id, fecha)}
         onFusionar={(otroId) => onFusionarHistorial(ejDetalle.id, otroId)}
@@ -275,6 +279,38 @@ export function Progreso({ dias, volver, onEditarHistorial, onEliminarHistorial,
             </div>
           );
         })}
+
+        {ejerciciosSinHistorial.length > 0 && (
+          <div style={{ marginTop: 30, paddingTop: 22, borderTop: `1px solid ${C.linea}` }}>
+            <Etiqueta>Sin registros</Etiqueta>
+            <div style={{ fontFamily: SANS, fontSize: 13, color: C.gris, marginTop: 8, lineHeight: 1.45 }}>
+              Todavía no tienen ninguna sesión cargada. Entrá para agregar una a mano.
+            </div>
+            <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+              {ejerciciosSinHistorial.map((e) => (
+                <button
+                  key={e.id}
+                  onClick={() => setDetalleId(e.id)}
+                  style={{
+                    width: "100%",
+                    textAlign: "left",
+                    background: C.sup,
+                    border: `1px solid ${C.linea}`,
+                    borderRadius: 4,
+                    padding: "12px 14px",
+                    cursor: "pointer",
+                    WebkitTapHighlightColor: "transparent",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
+                    <span style={{ fontFamily: SANS, fontSize: 15, fontWeight: 600, color: C.hueso }}>{e.nombre}</span>
+                    <span style={{ fontFamily: MONO, fontSize: 11, color: C.gris, flexShrink: 0 }}>{e.diaNombre}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div style={{ marginTop: 36 }}>
           <Boton tono="fantasma" alto={54} onClick={volver}>

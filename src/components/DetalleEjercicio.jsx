@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { C, MONO, SANS } from "../theme";
-import { fmt } from "../utils/format";
+import { fmt, hoy } from "../utils/format";
 import { ejerciciosFusionables } from "../domain/rutina";
 import { Marco } from "./Marco";
 import { Cabecera } from "./Cabecera";
@@ -301,8 +301,22 @@ function SelectorFusion({ ejercicio, candidatos, onConfirmar, volver }) {
   );
 }
 
-export function DetalleEjercicio({ ejercicio, dias, onEditar, onEliminar, onFusionar, volver }) {
+// Entrada en blanco para cargar una sesión a mano, con la forma que
+// corresponde al tipo de ejercicio y sembrada con sus objetivos actuales.
+function entradaNueva(ej) {
+  const fecha = hoy();
+  if (ej.tipo === "cardio") {
+    return { fecha, duracion: ej.duracionMin ?? 0, distancia: ej.distanciaKm ?? null };
+  }
+  if (ej.tipo === "tiempo") {
+    return { fecha, series: [{ segundos: ej.duracionObjetivo ?? 30 }] };
+  }
+  return { fecha, series: [{ peso: ej.peso ?? 0, reps: ej.repsObjetivo ?? 8, rir: 1 }] };
+}
+
+export function DetalleEjercicio({ ejercicio, dias, onAgregar, onEditar, onEliminar, onFusionar, volver }) {
   const [fusionando, setFusionando] = useState(false);
+  const [agregando, setAgregando] = useState(false);
   const historialDesc = [...ejercicio.historial].sort((a, b) => b.fecha.localeCompare(a.fecha));
 
   if (fusionando) {
@@ -325,7 +339,30 @@ export function DetalleEjercicio({ ejercicio, dias, onEditar, onEliminar, onFusi
       <div style={{ padding: "8px 20px 40px" }}>
         <div style={{ fontFamily: SANS, fontSize: 13, color: C.gris, marginBottom: 18 }}>
           {historialDesc.length} sesión{historialDesc.length !== 1 ? "es" : ""} registrada{historialDesc.length !== 1 ? "s" : ""}.
-          Corregí cualquier registro si se cargó mal, o eliminalo.
+          Corregí cualquier registro si se cargó mal, eliminalo, o agregá una sesión que falte.
+        </div>
+
+        <div style={{ marginBottom: 14 }}>
+          {agregando ? (
+            <div style={{ background: C.sup, border: `1px solid ${C.linea}`, borderRadius: 6, overflow: "hidden" }}>
+              <div style={{ padding: "12px 14px", fontFamily: SANS, fontSize: 14, color: C.hueso }}>
+                Nueva sesión
+              </div>
+              <FormEditor
+                tipo={ejercicio.tipo}
+                entrada={entradaNueva(ejercicio)}
+                onCancelar={() => setAgregando(false)}
+                onGuardar={(entrada) => {
+                  onAgregar(entrada);
+                  setAgregando(false);
+                }}
+              />
+            </div>
+          ) : (
+            <button onClick={() => setAgregando(true)} style={{ ...SMALL_BTN, color: C.sodio, borderColor: C.sodio }}>
+              + agregar sesión
+            </button>
+          )}
         </div>
 
         {historialDesc.map((h) => (

@@ -136,3 +136,89 @@ describe("construirSesiones con sesión mixta (fuerza + tiempo)", () => {
     expect(sesion.ejercicios[0]).toEqual({ nombre: "Plancha", tipo: "tiempo", series: [{ segundos: 30 }] });
   });
 });
+
+describe("construirSesiones con ejercicios compartidos entre días", () => {
+  const historialCompartido = [{ fecha: "2026-08-31", series: [{ peso: 90, reps: 8, rir: 1 }] }];
+
+  function diasConEjercicioCompartido(extra = {}) {
+    return [
+      {
+        id: "a",
+        nombre: "Día A",
+        ...extra.a,
+        ejercicios: [
+          { id: "prensa", tipo: "fuerza", descanso: 120, nombre: "Prensa de piernas", historial: historialCompartido },
+        ],
+      },
+      {
+        id: "c",
+        nombre: "Día C",
+        ...extra.c,
+        ejercicios: [
+          { id: "prensa", tipo: "fuerza", descanso: 120, nombre: "Prensa de piernas", historial: historialCompartido },
+        ],
+      },
+    ];
+  }
+
+  it("sin sesionesFechas (dato viejo) genera una sesión fantasma por cada día que comparte el ejercicio", () => {
+    const sesiones = construirSesiones(diasConEjercicioCompartido());
+    expect(sesiones.map((s) => s.dia)).toEqual(["Día A", "Día C"]);
+  });
+
+  it("con sesionesFechas, sólo genera la sesión del día realmente entrenado", () => {
+    const dias = diasConEjercicioCompartido({ a: { sesionesFechas: ["2026-08-31"] }, c: { sesionesFechas: [] } });
+    const sesiones = construirSesiones(dias);
+    expect(sesiones).toHaveLength(1);
+    expect(sesiones[0].dia).toBe("Día A");
+  });
+});
+
+describe("construirSesiones: duración estimada", () => {
+  it("estima minutos a partir de series + descanso para fuerza, sin depender de cardio", () => {
+    const dias = [
+      {
+        id: "a",
+        nombre: "Día A",
+        ejercicios: [
+          {
+            id: "banca1",
+            tipo: "fuerza",
+            descanso: 90,
+            nombre: "Press banca",
+            historial: [{ fecha: "2026-07-01", series: [{ peso: 60, reps: 8, rir: 1 }, { peso: 60, reps: 8, rir: 1 }] }],
+          },
+        ],
+      },
+    ];
+    const [sesion] = construirSesiones(dias);
+    // 2 series * 45s activos + 1 descanso de 90s = 180s = 3 min
+    expect(sesion.duracion_min).toBe(3);
+  });
+
+  it("suma la duración real de cardio a la estimación de fuerza/tiempo", () => {
+    const dias = [
+      {
+        id: "a",
+        nombre: "Día A",
+        ejercicios: [
+          {
+            id: "trote1",
+            tipo: "cardio",
+            nombre: "Trote",
+            historial: [{ fecha: "2026-07-01", duracion: 20, distancia: null }],
+          },
+          {
+            id: "banca1",
+            tipo: "fuerza",
+            descanso: 90,
+            nombre: "Press banca",
+            historial: [{ fecha: "2026-07-01", series: [{ peso: 60, reps: 8, rir: 1 }, { peso: 60, reps: 8, rir: 1 }] }],
+          },
+        ],
+      },
+    ];
+    const [sesion] = construirSesiones(dias);
+    expect(sesion.duracion_min).toBe(23); // 20 min cardio + 3 min estimados de fuerza
+  });
+});

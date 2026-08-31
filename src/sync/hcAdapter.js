@@ -121,26 +121,59 @@ export function aplicarRutina(rutinaHC, diasLocales) {
   });
 }
 
+// Estimación de tiempo activo por serie de fuerza (ejecución + ajustar
+// peso/asiento) para calcular una duración total aproximada — no medimos
+// tiempo real de sesión, así que esto es sólo una aproximación razonable.
+const SEGUNDOS_ACTIVOS_POR_SERIE = 45;
+
+// A qué día(s) confirmó explícitamente cada fecha `marcarSesionDia`. Sirve
+// para desambiguar sesiones de ejercicios compartidos entre días: sin
+// esto, una fecha en la que sólo se entrenó Día A pero que comparte algún
+// ejercicio con Día C generaba también una sesión fantasma para Día C
+// (con esa fecha en su propio historial), y al haber dos sesiones con la
+// misma fecha, cuál "ganaba" en el backend dependía del orden de los días.
+function fechasConfirmadasPorDia(dias) {
+  const porFecha = new Map();
+  dias.forEach((d) => {
+    (d.sesionesFechas ?? []).forEach((fecha) => {
+      if (!porFecha.has(fecha)) porFecha.set(fecha, new Set());
+      porFecha.get(fecha).add(d.id);
+    });
+  });
+  return porFecha;
+}
+
 export function construirSesiones(dias) {
   const sesiones = [];
+  const confirmadas = fechasConfirmadasPorDia(dias);
   dias.forEach((dia) => {
     const fechas = [
       ...new Set(dia.ejercicios.flatMap((e) => e.historial.map((h) => h.fecha))),
-    ];
+    ].filter((fecha) => {
+      const diasQueLaConfirman = confirmadas.get(fecha);
+      // Si ningún día confirmó explícitamente esta fecha (historial viejo,
+      // de antes de sesionesFechas), se mantiene el heurístico anterior:
+      // se incluye en todos los días donde aparezca en el historial.
+      return !diasQueLaConfirman || diasQueLaConfirman.has(dia.id);
+    });
+
     fechas.forEach((fecha) => {
-      const ejercicios = dia.ejercicios
+      const entradas = dia.ejercicios
         .map((e) => {
           const entrada = e.historial.find((h) => h.fecha === fecha);
-          if (!entrada) return null;
-          if (e.tipo === "cardio") {
-            return { nombre: e.nombre, tipo: "cardio", duracion: entrada.duracion, distancia: entrada.distancia, series: [] };
-          }
-          if (e.tipo === "tiempo") {
-            return { nombre: e.nombre, tipo: "tiempo", series: entrada.series };
-          }
-          return { nombre: e.nombre, series: entrada.series };
+          return entrada ? { e, entrada } : null;
         })
         .filter(Boolean);
+
+      const ejercicios = entradas.map(({ e, entrada }) => {
+        if (e.tipo === "cardio") {
+          return { nombre: e.nombre, tipo: "cardio", duracion: entrada.duracion, distancia: entrada.distancia, series: [] };
+        }
+        if (e.tipo === "tiempo") {
+          return { nombre: e.nombre, tipo: "tiempo", series: entrada.series };
+        }
+        return { nombre: e.nombre, series: entrada.series };
+      });
       // Sólo suma series con peso/reps (fuerza) — una serie de tiempo
       // ({segundos}, sin esos campos) daría NaN, y como la suma es
       // contagiosa el volumen de toda la sesión quedaría NaN apenas
@@ -154,9 +187,28 @@ export function construirSesiones(dias) {
           ) ?? 0),
         0
       );
-      const duracion_min = ejercicios
-        .filter((e) => e.tipo === "cardio")
-        .reduce((sum, e) => sum + (e.duracion ?? 0), 0) || null;
+
+      const minutosCardio = entradas
+        .filter(({ e }) => e.tipo === "cardio")
+        .reduce((sum, { entrada }) => sum + (entrada.duracion ?? 0), 0);
+
+      // Fuerza/tiempo no miden duración real: se estima con el tiempo activo
+      // por serie (o los segundos sostenidos, para tipo "tiempo") más el
+      // descanso entre series (no después de la última).
+      const segundosEstimados = entradas
+        .filter(({ e }) => e.tipo !== "cardio")
+        .reduce((sum, { e, entrada }) => {
+          const numSeries = entrada.series?.length ?? 0;
+          if (numSeries === 0) return sum;
+          const activo =
+            e.tipo === "tiempo"
+              ? entrada.series.reduce((s, serie) => s + (serie.segundos ?? 0), 0)
+              : numSeries * SEGUNDOS_ACTIVOS_POR_SERIE;
+          const descansos = Math.max(0, numSeries - 1) * (e.descanso ?? 0);
+          return sum + activo + descansos;
+        }, 0);
+
+      const duracion_min = Math.round(minutosCardio + segundosEstimados / 60) || null;
       sesiones.push({ fecha, dia: dia.nombre, ejercicios, volumen_kg, duracion_min });
     });
   });

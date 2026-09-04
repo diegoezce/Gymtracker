@@ -1,6 +1,6 @@
 import { diasDondeAparece } from "../domain/rutina";
 
-const HC_URL = "https://hc.sparkio.me";
+const HC_URL = "https://hm.sparkio.me";
 
 export const TOKEN_KEY = "gym:hc:token";
 export const SYNC_KEY = "gym:hc:ultima-sync";

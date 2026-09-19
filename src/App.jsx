@@ -3,6 +3,7 @@ import { storage, CLAVE_RUTINA, CLAVE_SESION } from "./storage";
 import { RUTINA_INICIAL, actualizarCompartido, vincularEjercicio, resincronizarCompartidos, agregarEntradaHistorial, editarEntradaHistorial, eliminarEntradaHistorial, fusionarEjercicios, marcarSesionDia } from "./domain/rutina";
 import { leerToken, leerAutoSync, fetchSesiones, aplicarSesiones, pushSesiones, construirSesiones, fetchRutina, aplicarRutina, SYNC_KEY, TOKEN_KEY } from "./sync/hcAdapter";
 import { progresar, aprender } from "./domain/progression";
+import { olvidarProgreso, entradasAVolcar } from "./domain/sesion";
 import { hoy } from "./utils/format";
 import { Marco } from "./components/Marco";
 import { Inicio } from "./components/Inicio";
@@ -183,7 +184,13 @@ export default function App() {
     setDias(nuevos);
     setAviso(av || nota);
     syncSilencioso(nuevos);
-    setSesion({ ...sesion, ejIdx: null, series: [], hechos: { ...sesion.hechos, [ej.id]: true } });
+    setSesion({
+      ...sesion,
+      ejIdx: null,
+      series: [],
+      hechos: { ...sesion.hechos, [ej.id]: true },
+      progreso: olvidarProgreso(sesion.progreso, ej.id),
+    });
   };
 
   const guardarSerieTiempo = (segundos) => {
@@ -206,7 +213,13 @@ export default function App() {
     setDias(nuevos);
     setAviso(nota);
     syncSilencioso(nuevos);
-    setSesion({ ...sesion, ejIdx: null, series: [], hechos: { ...sesion.hechos, [ej.id]: true } });
+    setSesion({
+      ...sesion,
+      ejIdx: null,
+      series: [],
+      hechos: { ...sesion.hechos, [ej.id]: true },
+      progreso: olvidarProgreso(sesion.progreso, ej.id),
+    });
   };
 
   // Vuelve al menú: guarda series parciales + timerFin en sesion.progreso (no en historial)
@@ -231,10 +244,14 @@ export default function App() {
     if (ej && ej.tipo !== "cardio" && sesion.series.length > 0) {
       progreso[ej.id] = { series: sesion.series, pesoActual: sesion.pesoActual };
     }
-    // los salteados no se registran, aunque tengan series parciales cargadas
-    const entradas = Object.entries(progreso).filter(
-      ([id, p]) => p.series?.length > 0 && !sesion.saltados?.[id]
-    );
+    // Los salteados no se registran aunque tengan series parciales, y los
+    // ya cerrados tampoco: ésos escribieron su entrada al cerrarse, y
+    // volcarlos otra vez sumaría sus parciales a las series de la sesión
+    // (agregarEntradaHistorial fusiona por fecha).
+    const entradas = entradasAVolcar(progreso, {
+      hechos: sesion.hechos,
+      saltados: sesion.saltados,
+    });
     let nuevos = dias;
     if (entradas.length > 0) {
       entradas.forEach(([id, p]) => {

@@ -4,6 +4,7 @@ import { RUTINA_INICIAL, actualizarCompartido, vincularEjercicio, resincronizarC
 import { leerToken, leerAutoSync, fetchSesiones, aplicarSesiones, pushSesiones, construirSesiones, fetchRutina, aplicarRutina, SYNC_KEY, TOKEN_KEY } from "./sync/hcAdapter";
 import { progresar, aprender } from "./domain/progression";
 import { olvidarProgreso, entradasAVolcar } from "./domain/sesion";
+import { resumenSesion } from "./domain/resumen";
 import { hoy } from "./utils/format";
 import { Marco } from "./components/Marco";
 import { Inicio } from "./components/Inicio";
@@ -12,6 +13,7 @@ import { Sesion } from "./components/Sesion";
 import { Ajustes } from "./components/Ajustes";
 import { Progreso } from "./components/Progreso";
 import { ConfirmarSync } from "./components/ConfirmarSync";
+import { Resumen } from "./components/Resumen";
 import { C, MONO } from "./theme";
 
 export default function App() {
@@ -22,6 +24,7 @@ export default function App() {
   const [sesionPausada, setSesionPausada] = useState(false);
   const [aviso, setAviso] = useState("");
   const [preguntaSync, setPreguntaSync] = useState(null);
+  const [resumen, setResumen] = useState(null);
   const primeraCarga = useRef(true);
 
   useEffect(() => {
@@ -272,9 +275,23 @@ export default function App() {
       setPreguntaSync(nuevos);
       return;
     }
-    if (huboActividad) syncSilencioso(nuevos);
+    if (!huboActividad) {
+      setSesion(null);
+      setPantalla("inicio");
+      return;
+    }
+    syncSilencioso(nuevos);
+    terminarConResumen(nuevos);
+  };
+
+  // Cierra la sesión mostrando el resumen del día. Se calcula sobre los
+  // `dias` ya actualizados, así que incluye tanto los ejercicios cerrados
+  // durante la sesión como los parciales que se vuelcan al salir.
+  const terminarConResumen = (diasFinales) => {
     setSesion(null);
-    setPantalla("inicio");
+    const r = resumenSesion(diasFinales, hoy());
+    setResumen(r);
+    setPantalla(r ? "resumen" : "inicio");
   };
 
   const confirmarSyncYSalir = async () => {
@@ -282,9 +299,9 @@ export default function App() {
       const token = leerToken();
       await pushSesiones(token, construirSesiones(preguntaSync));
       localStorage.setItem(SYNC_KEY, new Date().toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }));
+      const diasFinales = preguntaSync;
       setPreguntaSync(null);
-      setSesion(null);
-      setPantalla("inicio");
+      terminarConResumen(diasFinales);
     } catch (e) {
       if (e.message === "401") localStorage.removeItem(TOKEN_KEY);
       throw e; // ConfirmarSync lo muestra y deja reintentar o salir sin sincronizar
@@ -292,9 +309,9 @@ export default function App() {
   };
 
   const salirSinSincronizar = () => {
+    const diasFinales = preguntaSync;
     setPreguntaSync(null);
-    setSesion(null);
-    setPantalla("inicio");
+    terminarConResumen(diasFinales);
   };
 
   // Trae sólo el historial: lo aplica sobre la rutina local que ya tengas.
@@ -411,6 +428,17 @@ export default function App() {
         aplicarRutinaDeHC={aplicarRutinaDeHC}
         onImportarRutina={(nuevos) => setDias(resincronizarCompartidos(nuevos))}
         volver={() => setPantalla("inicio")}
+      />
+    );
+
+  if (pantalla === "resumen" && resumen)
+    return (
+      <Resumen
+        resumen={resumen}
+        volver={() => {
+          setResumen(null);
+          setPantalla("inicio");
+        }}
       />
     );
 

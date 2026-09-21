@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { C, MONO, SANS } from "../theme";
 import { barra } from "../styles/helpers";
 import { fmt, hoy } from "../utils/format";
+import { sugerirPeso } from "../domain/progression";
 import { Marco } from "./Marco";
 import { Cabecera } from "./Cabecera";
 import { Etiqueta } from "./Etiqueta";
@@ -182,6 +183,11 @@ export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarSerieT
       ? [...historialPrevio].reverse().find((h) => h.series?.length > 0)
       : null;
 
+  // Sugerencia para la próxima serie, a partir de cómo vino la última.
+  // Sólo tiene sentido si queda al menos una serie por hacer.
+  const sugerencia = hayMasSeries ? sugerirPeso(ej, sesion.series) : null;
+  const aplicarSugerencia = () => setSesion({ ...sesion, pesoActual: sugerencia.peso });
+
   // Re-schedule SW notification when mounting with a restored timer
   useEffect(() => {
     if (timerFin) programarNotificacion(ej.id, timerFin);
@@ -350,6 +356,38 @@ export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarSerieT
                 </button>
               </div>
             </div>
+          )}
+
+          {sugerencia && (
+            sugerencia.peso !== sesion.pesoActual ? (
+              <button
+                onClick={aplicarSugerencia}
+                style={{
+                  width: "100%",
+                  textAlign: "left",
+                  background: C.sup,
+                  border: `1px solid ${C.sodio}`,
+                  borderRadius: 4,
+                  padding: "10px 12px",
+                  cursor: "pointer",
+                  WebkitTapHighlightColor: "transparent",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
+                  <span style={{ fontFamily: MONO, fontSize: 14, color: C.sodio, fontWeight: 700 }}>
+                    {sugerencia.delta > 0 ? "↑" : sugerencia.delta < 0 ? "↓" : "→"} Sugerido: {fmt(sugerencia.peso)} kg
+                  </span>
+                  <span style={{ fontFamily: SANS, fontSize: 11, color: C.gris, flexShrink: 0 }}>tocá para usar</span>
+                </div>
+                <div style={{ fontFamily: SANS, fontSize: 12, color: C.gris, marginTop: 3 }}>
+                  {sugerencia.motivo}
+                </div>
+              </button>
+            ) : (
+              <div style={{ fontFamily: SANS, fontSize: 12, color: C.gris, padding: "2px 2px 0" }}>
+                {sugerencia.delta === 0 ? "Mantené este peso" : "Peso sugerido"} · {sugerencia.motivo}
+              </div>
+            )
           )}
 
           {timerSeg !== null ? (

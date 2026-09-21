@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { progresar, aprender } from "./progression";
+import { progresar, aprender, sugerirPeso } from "./progression";
 
 function ej(overrides = {}) {
   return {
@@ -177,5 +177,71 @@ describe("aprender con tipo cardio/tiempo", () => {
   it("no cambia nada para cardio ni tiempo", () => {
     expect(aprender({ tipo: "cardio" }, 100)).toEqual({ ajustes: [], incremento: 0, aviso: "" });
     expect(aprender({ tipo: "tiempo", incremento: 5 }, 30)).toEqual({ ajustes: [], incremento: 5, aviso: "" });
+  });
+});
+
+describe("sugerirPeso", () => {
+  const rango = (o = {}) => ej({ repsMin: 8, repsMax: 12, repsObjetivo: 8, incremento: 1, peso: 15, ...o });
+
+  it("no sugiere nada antes de la primera serie", () => {
+    expect(sugerirPeso(rango(), [])).toBeNull();
+    expect(sugerirPeso(rango(), undefined)).toBeNull();
+  });
+
+  it("no sugiere nada para cardio ni tiempo", () => {
+    const serie = [{ peso: 15, reps: 10, rir: 2 }];
+    expect(sugerirPeso(rango({ tipo: "cardio" }), serie)).toBeNull();
+    expect(sugerirPeso(rango({ tipo: "tiempo" }), serie)).toBeNull();
+  });
+
+  it("sube cuando llegaste al techo del rango y sobró margen", () => {
+    const s = sugerirPeso(rango(), [{ peso: 15, reps: 12, rir: 3 }]);
+    expect(s).toMatchObject({ peso: 16, delta: 1 });
+    expect(s.motivo).toMatch(/12 reps/);
+  });
+
+  it("mantiene si sobró margen pero no llegaste al techo", () => {
+    const s = sugerirPeso(rango(), [{ peso: 15, reps: 9, rir: 3 }]);
+    expect(s).toMatchObject({ peso: 15, delta: 0 });
+    expect(s.motivo).toMatch(/12 reps/);
+  });
+
+  it("baja tras dos series al fallo seguidas", () => {
+    const s = sugerirPeso(rango(), [
+      { peso: 15, reps: 9, rir: 0 },
+      { peso: 15, reps: 8, rir: 0 },
+    ]);
+    expect(s).toMatchObject({ peso: 14, delta: -1 });
+    expect(s.motivo).toMatch(/dos series al fallo/i);
+  });
+
+  it("baja si fue al fallo sin llegar al piso del rango", () => {
+    const s = sugerirPeso(rango(), [{ peso: 15, reps: 6, rir: 0 }]);
+    expect(s).toMatchObject({ peso: 14, delta: -1 });
+  });
+
+  it("mantiene si fue al fallo pero dentro del rango", () => {
+    expect(sugerirPeso(rango(), [{ peso: 15, reps: 10, rir: 0 }])).toMatchObject({ peso: 15, delta: 0 });
+  });
+
+  it("mantiene en la zona buena (RIR 1-2 dentro del rango)", () => {
+    expect(sugerirPeso(rango(), [{ peso: 15, reps: 10, rir: 1 }])).toMatchObject({ peso: 15, delta: 0 });
+    expect(sugerirPeso(rango(), [{ peso: 15, reps: 10, rir: 2 }])).toMatchObject({ peso: 15, delta: 0 });
+  });
+
+  it("parte del peso de la última serie, no de ej.peso", () => {
+    // el usuario ya subió a mano a 20 durante la sesión
+    const s = sugerirPeso(rango({ peso: 15 }), [{ peso: 20, reps: 12, rir: 3 }]);
+    expect(s.peso).toBe(21);
+  });
+
+  it("nunca sugiere menos que un incremento", () => {
+    const s = sugerirPeso(rango({ incremento: 5 }), [{ peso: 5, reps: 3, rir: 0 }]);
+    expect(s.peso).toBe(5);
+  });
+
+  it("usa repsObjetivo cuando no hay rango (datos legados)", () => {
+    const legado = ej({ peso: 60, incremento: 2.5, repsObjetivo: 8, repsMin: undefined, repsMax: undefined });
+    expect(sugerirPeso(legado, [{ peso: 60, reps: 8, rir: 3 }])).toMatchObject({ peso: 62.5, delta: 2.5 });
   });
 });

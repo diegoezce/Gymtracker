@@ -64,6 +64,53 @@ export function progresar(ej, seriesHechas) {
 }
 
 /**
+ * Sugiere el peso de la PRÓXIMA serie dentro de la sesión en curso, mirando
+ * cómo vino la serie recién hecha. Es autorregulación intra-sesión: distinto
+ * de progresar(), que decide el peso de la próxima *sesión* al cerrar el
+ * ejercicio.
+ *
+ * Arranca del peso de la última serie hecha (no de ej.peso), así respeta los
+ * ajustes que el usuario ya hizo a mano durante la sesión.
+ *
+ * Devuelve null cuando no hay nada que sugerir: cardio, tiempo, o todavía no
+ * se hizo ninguna serie (para la primera manda ej.peso, que ya viene de
+ * progresar()).
+ *
+ * @param {{peso: number, incremento: number, repsObjetivo: number, repsMin?: number, repsMax?: number}} ej
+ * @param {Array<{peso: number, reps: number, rir: number}>} seriesHechas
+ * @returns {{peso: number, delta: number, motivo: string} | null}
+ */
+export function sugerirPeso(ej, seriesHechas) {
+  if (ej.tipo === "cardio" || ej.tipo === "tiempo") return null;
+  if (!seriesHechas?.length) return null;
+
+  const ultima = seriesHechas[seriesHechas.length - 1];
+  const previa = seriesHechas[seriesHechas.length - 2];
+  if (ultima?.peso == null || ultima?.reps == null) return null;
+
+  const inc = ej.incremento || 1;
+  const min = ej.repsMin ?? ej.repsObjetivo;
+  const max = ej.repsMax ?? ej.repsObjetivo;
+  const base = ultima.peso;
+
+  const bajar = (motivo) => ({ peso: Math.max(inc, base - inc), delta: -inc, motivo });
+  const subir = (motivo) => ({ peso: base + inc, delta: inc, motivo });
+  const mantener = (motivo) => ({ peso: base, delta: 0, motivo });
+
+  // Dos al fallo seguidas: la fatiga ya se acumuló, bajar para sostener reps.
+  if (ultima.rir === 0 && previa?.rir === 0) return bajar("Dos series al fallo seguidas");
+  // Al fallo sin llegar al piso del rango: el peso es demasiado para hoy.
+  if (ultima.rir === 0 && ultima.reps < min) return bajar(`Al fallo sin llegar a ${min} reps`);
+  if (ultima.rir === 0) return mantener("Al fallo pero dentro del rango");
+  // Techo del rango con margen de sobra: el peso quedó corto.
+  if (ultima.rir >= 3 && ultima.reps >= max) return subir(`${ultima.reps} reps y te sobró margen`);
+  // Margen pero sin llegar al techo: primero ganar reps, después peso.
+  if (ultima.rir >= 3) return mantener(`Te sobró margen: buscá llegar a ${max} reps`);
+  if (ultima.reps < min) return mantener(`Cortaste antes de ${min} reps`);
+  return mantener("Vas en el rango");
+}
+
+/**
  * Aprende de cuándo el usuario le pisa la sugerencia de peso: si ajusta
  * manualmente en la misma dirección 3 veces seguidas, recalibra el salto.
  *

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sugerirDia, ultimaVezDia, contarSesiones } from "./inicio";
+import { sugerirDia, ultimaVezDia, contarSesiones, descripcionDia } from "./inicio";
 
 const dia = (id, nombre, ultimaSesion, ejercicios = []) => ({ id, nombre, ultimaSesion, ejercicios });
 
@@ -111,5 +111,45 @@ describe("contarSesiones", () => {
 
   it("no rompe sin datos", () => {
     expect(contarSesiones([])).toMatchObject({ total: 0, estaSemana: 0, esteMes: 0, ultima: null });
+  });
+});
+
+describe("descripcionDia", () => {
+  const conEjercicios = (nombre) => ({
+    id: "a",
+    nombre,
+    ejercicios: [
+      { id: "1", nombre: "Prensa de piernas" },
+      { id: "2", nombre: "Press banca inclinado" },
+      { id: "3", nombre: "Remo con apoyo de pecho" },
+      { id: "4", nombre: "Curl femoral sentado" },
+    ],
+  });
+
+  it("lista los primeros ejercicios si el nombre es el genérico", () => {
+    expect(descripcionDia(conEjercicios("Día A"))).toBe(
+      "Prensa de piernas · Press banca inclinado · Remo con apoyo de pecho"
+    );
+  });
+
+  it("reconoce variantes del nombre genérico", () => {
+    for (const n of ["Día A", "día b", "Dia 1", "DÍA C"]) {
+      expect(descripcionDia(conEjercicios(n))).toBeTruthy();
+    }
+  });
+
+  it("no agrega nada si el día tiene nombre propio", () => {
+    expect(descripcionDia(conEjercicios("Pierna + Empuje"))).toBeNull();
+    expect(descripcionDia(conEjercicios("Día de pierna"))).toBeNull();
+    expect(descripcionDia(conEjercicios("Empuje"))).toBeNull();
+  });
+
+  it("respeta el máximo pedido", () => {
+    expect(descripcionDia(conEjercicios("Día A"), 2)).toBe("Prensa de piernas · Press banca inclinado");
+  });
+
+  it("no rompe con un día vacío", () => {
+    expect(descripcionDia({ id: "a", nombre: "Día A", ejercicios: [] })).toBeNull();
+    expect(descripcionDia(undefined)).toBeNull();
   });
 });

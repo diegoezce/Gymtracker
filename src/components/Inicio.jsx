@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { C, MONO, SANS } from "../theme";
 import { diasDesdeStr } from "../utils/format";
-import { sugerirDia, ultimaVezDia, contarSesiones } from "../domain/inicio";
+import { sugerirDia, ultimaVezDia, contarSesiones, descripcionDia } from "../domain/inicio";
 import { Marco } from "./Marco";
 import { Etiqueta } from "./Etiqueta";
 import { Boton } from "./Boton";
@@ -58,6 +58,13 @@ export function Inicio({ dias, aviso, sesion, sesionPausada, comenzar, onReanuda
     if (diaPausado && d.id === diaPausado.id) return onReanudar();
     if (diaPausado) return setDescartando(d);
     comenzar(d);
+  };
+
+  // Una sola línea siempre: si los ejercicios no entran, se cortan solos.
+  const unaLinea = {
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
   };
 
   const subtitulo = (d) => {
@@ -135,6 +142,11 @@ export function Inicio({ dias, aviso, sesion, sesionPausada, comenzar, onReanuda
             <div style={{ fontFamily: SANS, fontSize: 26, fontWeight: 700, color: C.hueso, marginTop: 6 }}>
               {sugerido.nombre}
             </div>
+            {!diaPausado && descripcionDia(sugerido) && (
+              <div style={{ ...unaLinea, fontFamily: SANS, fontSize: 13, color: C.hueso, opacity: 0.75, marginTop: 4 }}>
+                {descripcionDia(sugerido)}
+              </div>
+            )}
             <div style={{ fontFamily: MONO, fontSize: 12, color: C.gris, marginTop: 3 }}>
               {diaPausado ? "Tocá para seguir donde quedaste" : subtitulo(sugerido)}
             </div>
@@ -181,6 +193,11 @@ export function Inicio({ dias, aviso, sesion, sesionPausada, comenzar, onReanuda
                       {subtitulo(d)}
                     </span>
                   </div>
+                  {descripcionDia(d) && (
+                    <div style={{ ...unaLinea, fontFamily: SANS, fontSize: 12, color: C.gris, marginTop: 3 }}>
+                      {descripcionDia(d)}
+                    </div>
+                  )}
                 </button>
               ))}
             </div>

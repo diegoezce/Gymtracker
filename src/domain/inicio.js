@@ -44,3 +44,27 @@ export function contarSesiones(dias, ahora = new Date()) {
 
   return { fechas, estaSemana, esteMes, total: fechas.length, ultima: fechas[fechas.length - 1] ?? null };
 }
+
+// "Día A", "Día B", "Dia 1" son los nombres que vienen por defecto: no
+// dicen nada del contenido. Cualquier otra cosa la puso el usuario.
+const NOMBRE_GENERICO = /^d[ií]a\s+\S+$/i;
+
+export function esNombreGenerico(nombre) {
+  return NOMBRE_GENERICO.test((nombre ?? "").trim());
+}
+
+/**
+ * Qué mostrar debajo del nombre del día para saber de qué va.
+ *
+ * Si le pusiste un nombre propio ("Pierna + Empuje"), ese nombre ya lo
+ * dice y repetir ejercicios sería ruido. Si todavía tiene el genérico
+ * ("Día A"), los primeros ejercicios son lo que de verdad lo distingue —
+ * y como el orden se controla en Ajustes, controlás qué aparece acá.
+ *
+ * Devuelve null cuando no hay nada útil que agregar.
+ */
+export function descripcionDia(dia, max = 3) {
+  if (!dia?.ejercicios?.length) return null;
+  if (!esNombreGenerico(dia.nombre)) return null;
+  return dia.ejercicios.slice(0, max).map((e) => e.nombre).join(" · ");
+}

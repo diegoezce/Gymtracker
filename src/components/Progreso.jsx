@@ -2,6 +2,7 @@ import { useState } from "react";
 import { C, MONO, SANS } from "../theme";
 import { fmt, fechaCorta, diasDesdeStr } from "../utils/format";
 import { diasDondeAparece } from "../domain/rutina";
+import { contarSesiones } from "../domain/inicio";
 import { Marco } from "./Marco";
 import { Cabecera } from "./Cabecera";
 import { Boton } from "./Boton";
@@ -82,7 +83,6 @@ export function Progreso({ dias, volver, onAgregarHistorial, onEditarHistorial, 
   const [detalleId, setDetalleId] = useState(null);
   const [expandidos, setExpandidos] = useState(new Set());
   const [orden, setOrden] = useState(() => localStorage.getItem(ORDEN_KEY) ?? "reciente");
-  const ahora = new Date();
 
   const cambiarOrden = (v) => {
     setOrden(v);
@@ -99,18 +99,7 @@ export function Progreso({ dias, volver, onAgregarHistorial, onEditarHistorial, 
 
   // Una sesión = una fecha de calendario, sin importar cuántos ejercicios
   // (o días de rutina, si el ejercicio está compartido) se entrenaron ese día.
-  const todasFechas = [
-    ...new Set(dias.flatMap((d) => d.ejercicios.flatMap((e) => e.historial.map((h) => h.fecha)))),
-  ].sort();
-
-  const ultimaFecha = todasFechas[todasFechas.length - 1];
-
-  const estasSemana = todasFechas.filter((f) => (ahora - new Date(f)) / 86400000 < 7).length;
-
-  const esteMes = todasFechas.filter((f) => {
-    const d = new Date(f);
-    return d.getMonth() === ahora.getMonth() && d.getFullYear() === ahora.getFullYear();
-  }).length;
+  const { fechas: todasFechas, estaSemana, esteMes, ultima: ultimaFecha } = contarSesiones(dias);
 
   // Un ejercicio compartido entre días (mismo id) aparece una sola vez acá.
   const vistos = new Set();
@@ -159,7 +148,7 @@ export function Progreso({ dias, volver, onAgregarHistorial, onEditarHistorial, 
       <div style={{ padding: "8px 20px 40px" }}>
         <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
           {[
-            { label: "Esta semana", valor: estasSemana },
+            { label: "Esta semana", valor: estaSemana },
             { label: "Este mes", valor: esteMes },
             { label: "Total", valor: todasFechas.length },
           ].map(({ label, valor }) => (

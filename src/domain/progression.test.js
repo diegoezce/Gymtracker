@@ -265,8 +265,25 @@ describe("sugerirPeso", () => {
     });
   });
 
-  it("mantiene si fue al fallo pero dentro del rango", () => {
-    expect(sugerirPeso(rango(), [{ peso: 15, reps: 10, rir: 0 }])).toMatchObject({ peso: 15, delta: 0, motivo: "Al fallo, justo en el rango" });
+  it("mantiene si fue al fallo pero con margen sobre el piso", () => {
+    // rango 8-12: fallar en 10 deja 2 reps de colchón antes de caerse.
+    expect(sugerirPeso(rango(), [{ peso: 15, reps: 10, rir: 0 }])).toMatchObject({
+      peso: 15,
+      delta: 0,
+      motivo: "Al fallo, con margen sobre 8 reps",
+    });
+  });
+
+  it("baja si fue al fallo justo en el piso del rango", () => {
+    // Caso real: 15 kg × 10, × 10, × 8 al fallo con rango 8-11. Mantener
+    // dejaría la 4a serie por debajo del piso.
+    const s = sugerirPeso(rango({ repsMin: 8, repsMax: 11 }), [
+      { peso: 15, reps: 10, rir: 1 },
+      { peso: 15, reps: 10, rir: 1 },
+      { peso: 15, reps: 8, rir: 0 },
+    ]);
+    expect(s).toMatchObject({ peso: 14, delta: -1 });
+    expect(s.motivo).toBe("Al fallo justo en el piso de 8 reps");
   });
 
   it("mantiene en la zona buena (RIR 1-2 dentro del rango)", () => {

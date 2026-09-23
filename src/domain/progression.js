@@ -122,9 +122,18 @@ export function sugerirPeso(ej, seriesHechas) {
   }
   // Dos al fallo seguidas dentro del rango: la fatiga ya se acumuló.
   if (ultima.rir === 0 && previa?.rir === 0) return bajar("Dos series al fallo seguidas");
-  // Al fallo sin llegar al piso del rango: el peso es demasiado para hoy.
-  if (ultima.rir === 0 && ultima.reps < min) return bajar(`Al fallo sin llegar a ${min} reps`);
-  if (ultima.rir === 0) return mantener("Al fallo, justo en el rango");
+  // Al fallo en el piso del rango o por debajo: no queda margen. Mantener
+  // el peso haría caer la próxima serie fuera del rango por abajo, así que
+  // hay que bajar para sostener las reps.
+  if (ultima.rir === 0 && ultima.reps <= min) {
+    return bajar(
+      ultima.reps < min
+        ? `Al fallo sin llegar a ${min} reps`
+        : `Al fallo justo en el piso de ${min} reps`
+    );
+  }
+  // Al fallo pero con reps de sobra antes del piso: el peso todavía sirve.
+  if (ultima.rir === 0) return mantener(`Al fallo, con margen sobre ${min} reps`);
   // Justo en el techo con margen de sobra: el peso quedó corto.
   if (ultima.rir >= 3 && ultima.reps >= max) return subir(`${ultima.reps} reps y te sobró margen`);
   // Margen pero sin llegar al techo: primero ganar reps, después peso.

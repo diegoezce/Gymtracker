@@ -1,6 +1,7 @@
 import { diasDondeAparece } from "../domain/rutina";
 
 const HC_URL = "https://hm.sparkio.me";
+export const HC_HOST = HC_URL.replace(/^https?:\/\//, "");
 
 export const TOKEN_KEY = "gym:hc:token";
 export const SYNC_KEY = "gym:hc:ultima-sync";
@@ -11,13 +12,99 @@ export function leerToken() {
   return localStorage.getItem(TOKEN_KEY);
 }
 
+// Un cuerpo de error sirve si es corto y es texto del servidor; una página
+// HTML de error (nginx, Cloudflare) es ruido y no aporta nada al usuario.
+async function detalle(res) {
+  try {
+    const txt = (await res.text()).trim();
+    if (!txt || txt.length > 200 || /^\s*<!?[a-z]/i.test(txt)) return `Error ${res.status} del servidor`;
+    return `Error ${res.status}: ${txt}`;
+  } catch {
+    return `Error ${res.status} del servidor`;
+  }
+}
+
+/**
+ * Wrapper de fetch que traduce los fallos a algo que se pueda leer en la
+ * pantalla del celu.
+ *
+ * fetch() sólo rechaza cuando el pedido nunca llegó a destino: sin red, DNS
+ * caído, servidor apagado o CORS bloqueando la respuesta. El mensaje que tira
+ * el browser en ese caso ("Failed to fetch" en Chrome, "Load failed" en iOS)
+ * no dice nada, así que lo reemplazamos y marcamos el error con `tipo` para
+ * que la UI pueda distinguir "no llegué" de "el servidor dijo que no".
+ */
+async function pedir(path, opts) {
+  let res;
+  try {
+    res = await fetch(`${HC_URL}${path}`, opts);
+  } catch {
+    throw Object.assign(
+      new Error(
+        navigator.onLine === false
+          ? "Sin conexión a internet."
+          : `No se pudo llegar a ${HC_HOST}. Puede estar caído o bloqueando los pedidos.`
+      ),
+      { tipo: "red" }
+    );
+  }
+  if (res.status === 401) throw Object.assign(new Error("401"), { tipo: "auth" });
+  if (!res.ok) throw Object.assign(new Error(await detalle(res)), { tipo: "servidor", status: res.status });
+  return res;
+}
+
+/**
+ * Diagnóstico de por qué no se puede sincronizar, para poder distinguir sin
+ * abrir la consola del browser entre las tres causas que se ven iguales
+ * desde la UI:
+ *
+ * - `offline`  — el celular no tiene red.
+ * - `caido`    — no hay nadie del otro lado (DNS, servidor apagado, dominio
+ *                equivocado). Ni siquiera un pedido opaco llega.
+ * - `cors`     — el servidor contesta, pero no deja que esta app lea la
+ *                respuesta. Pasa cuando el origen de la app no está en la
+ *                lista de permitidos del backend.
+ * - `ok`       — el servidor responde y la app puede leerlo.
+ */
+export async function probarConexion() {
+  if (navigator.onLine === false) {
+    return { estado: "offline", mensaje: "El celular no tiene conexión a internet." };
+  }
+  try {
+    const res = await fetch(`${HC_URL}/api/gymtracker/sync/`);
+    return { estado: "ok", mensaje: `${HC_HOST} responde (HTTP ${res.status}).`, status: res.status };
+  } catch {
+    // Un pedido no-cors devuelve una respuesta opaca (ilegible) pero sólo si
+    // de verdad hubo alguien que la contestó: sirve justo para separar
+    // "servidor caído" de "servidor vivo que me bloquea".
+    try {
+      await fetch(HC_URL, { mode: "no-cors", cache: "no-store" });
+      return {
+        estado: "cors",
+        mensaje: `${HC_HOST} está levantado pero rechaza los pedidos de esta app (CORS). Hay que habilitar este origen en el servidor.`,
+      };
+    } catch {
+      return {
+        estado: "caido",
+        mensaje: `No hay respuesta de ${HC_HOST}. El servidor está caído o el dominio no resuelve.`,
+      };
+    }
+  }
+}
+
 export async function obtenerToken(username, password) {
-  const res = await fetch(`${HC_URL}/api/auth/token/`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password }),
-  });
-  if (!res.ok) throw new Error("Credenciales incorrectas");
+  let res;
+  try {
+    res = await pedir("/api/auth/token/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
+  } catch (e) {
+    // En el login un 401/400 es la contraseña, no una sesión vencida.
+    if (e.tipo === "auth" || e.status === 400) throw new Error("Usuario o contraseña incorrectos");
+    throw e;
+  }
   const data = await res.json();
   const t = data.token ?? data.access ?? data.key;
   if (!t) throw new Error("No se recibió token");
@@ -25,22 +112,18 @@ export async function obtenerToken(username, password) {
 }
 
 export async function pushSesiones(token, sesiones) {
-  const res = await fetch(`${HC_URL}/api/gymtracker/sync/`, {
+  const res = await pedir("/api/gymtracker/sync/", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Token ${token}` },
     body: JSON.stringify({ sesiones }),
   });
-  if (res.status === 401) throw new Error("401");
-  if (!res.ok) throw new Error(`Error ${res.status}`);
   return res.json();
 }
 
 export async function fetchSesiones(token) {
-  const res = await fetch(`${HC_URL}/api/gymtracker/sync/`, {
+  const res = await pedir("/api/gymtracker/sync/", {
     headers: { Authorization: `Token ${token}` },
   });
-  if (res.status === 401) throw new Error("401");
-  if (!res.ok) throw new Error(`Error ${res.status}`);
   return res.json(); // { sesiones: [...] }
 }
 
@@ -107,22 +190,18 @@ function extraerEstructura(dias) {
 }
 
 export async function pushRutina(token, dias) {
-  const res = await fetch(`${HC_URL}/api/gymtracker/rutina/`, {
+  const res = await pedir("/api/gymtracker/rutina/", {
     method: "PUT",
     headers: { "Content-Type": "application/json", Authorization: `Token ${token}` },
     body: JSON.stringify({ rutina: extraerEstructura(dias) }),
   });
-  if (res.status === 401) throw new Error("401");
-  if (!res.ok) throw new Error(`Error ${res.status}`);
   return res.json();
 }
 
 export async function fetchRutina(token) {
-  const res = await fetch(`${HC_URL}/api/gymtracker/rutina/`, {
+  const res = await pedir("/api/gymtracker/rutina/", {
     headers: { Authorization: `Token ${token}` },
   });
-  if (res.status === 401) throw new Error("401");
-  if (!res.ok) throw new Error(`Error ${res.status}`);
   return res.json(); // { rutina: [...] | null }
 }
 

@@ -220,8 +220,53 @@ describe("sugerirPeso", () => {
     expect(s).toMatchObject({ peso: 14, delta: -1 });
   });
 
+  describe("pasarse del techo del rango", () => {
+    // Caso real: prensa con objetivo 10-12, se hicieron 16 reps al fallo a
+    // 75 kg. Antes caía en "al fallo" y devolvía "mantener · dentro del
+    // rango" — además de falso (16 no está en 10-12), dejaba el peso corto.
+    const prensa = (o = {}) => ej({ repsMin: 10, repsMax: 12, repsObjetivo: 10, incremento: 1, peso: 86, ...o });
+
+    it("sube aunque la serie haya sido al fallo", () => {
+      const s = sugerirPeso(prensa(), [{ peso: 75, reps: 16, rir: 0 }]);
+      expect(s.delta).toBeGreaterThan(0);
+      expect(s.motivo).toBe("16 reps con objetivo 10–12");
+    });
+
+    it("escala el salto con lo que te pasaste, no un solo incremento", () => {
+      // 4 reps de más sobre 75 kg ≈ 12% ≈ +9 kg con incremento de 1
+      const s = sugerirPeso(prensa(), [{ peso: 75, reps: 16, rir: 0 }]);
+      expect(s.peso).toBe(84);
+    });
+
+    it("con un exceso chico sube poco", () => {
+      // 1 rep de más sobre 75 kg ≈ 3% ≈ +2 kg
+      expect(sugerirPeso(prensa(), [{ peso: 75, reps: 13, rir: 1 }]).peso).toBe(77);
+    });
+
+    it("recorta el exceso para no proponer un salto imposible", () => {
+      // 20 reps de más no son 60% más de peso: se recorta a 5 (~15%)
+      const s = sugerirPeso(prensa(), [{ peso: 100, reps: 32, rir: 0 }]);
+      expect(s.peso).toBe(115);
+    });
+
+    it("manda sobre dos series al fallo seguidas", () => {
+      // Dos al fallo con 16 reps es peso corto, no fatiga acumulada.
+      const s = sugerirPeso(prensa(), [
+        { peso: 75, reps: 16, rir: 0 },
+        { peso: 75, reps: 16, rir: 0 },
+      ]);
+      expect(s.delta).toBeGreaterThan(0);
+    });
+
+    it("redondea siempre a la grilla del incremento del ejercicio", () => {
+      const s = sugerirPeso(prensa({ incremento: 5 }), [{ peso: 75, reps: 16, rir: 0 }]);
+      expect(s.peso % 5).toBe(0);
+      expect(s.peso).toBe(85); // 9 kg estimados → 2 pasos de 5
+    });
+  });
+
   it("mantiene si fue al fallo pero dentro del rango", () => {
-    expect(sugerirPeso(rango(), [{ peso: 15, reps: 10, rir: 0 }])).toMatchObject({ peso: 15, delta: 0 });
+    expect(sugerirPeso(rango(), [{ peso: 15, reps: 10, rir: 0 }])).toMatchObject({ peso: 15, delta: 0, motivo: "Al fallo, justo en el rango" });
   });
 
   it("mantiene en la zona buena (RIR 1-2 dentro del rango)", () => {

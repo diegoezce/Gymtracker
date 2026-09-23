@@ -63,6 +63,22 @@ export function progresar(ej, seriesHechas) {
   return { peso, repsObjetivo, nota };
 }
 
+// Equivalencia clásica entre carga y repeticiones: ~3% de peso por rep.
+// Sirve para traducir "me sobraron N reps" en cuánto peso agregar.
+const SUBIDA_POR_REP = 0.03;
+// Más allá de unas pocas reps la equivalencia deja de valer, así que el
+// exceso se recorta: mejor quedarse corto y volver a subir en la próxima
+// serie que proponer un salto que no se pueda levantar.
+const EXCESO_MAX = 5;
+
+// Cuántos incrementos subir para volver al rango tras pasarse `exceso`
+// reps del techo. Se estima por porcentaje y se redondea a la grilla del
+// ejercicio (su `incremento`), que es lo que de verdad se puede cargar.
+function pasosParaBajarReps(peso, exceso, inc) {
+  const subida = peso * SUBIDA_POR_REP * Math.min(exceso, EXCESO_MAX);
+  return Math.max(1, Math.round(subida / inc));
+}
+
 /**
  * Sugiere el peso de la PRÓXIMA serie dentro de la sesión en curso, mirando
  * cómo vino la serie recién hecha. Es autorregulación intra-sesión: distinto
@@ -94,15 +110,22 @@ export function sugerirPeso(ej, seriesHechas) {
   const base = ultima.peso;
 
   const bajar = (motivo) => ({ peso: Math.max(inc, base - inc), delta: -inc, motivo });
-  const subir = (motivo) => ({ peso: base + inc, delta: inc, motivo });
+  const subir = (motivo, pasos = 1) => ({ peso: base + inc * pasos, delta: inc * pasos, motivo });
   const mantener = (motivo) => ({ peso: base, delta: 0, motivo });
 
-  // Dos al fallo seguidas: la fatiga ya se acumuló, bajar para sostener reps.
+  // Pasarse del techo del rango manda sobre todo lo demás, incluso sobre el
+  // fallo: llegar al fallo en 16 reps con un objetivo de 10-12 no es una
+  // serie pesada, es una serie liviana llevada al límite. El peso quedó
+  // corto y un solo incremento no alcanza para corregirlo.
+  if (ultima.reps > max) {
+    return subir(`${ultima.reps} reps con objetivo ${min}–${max}`, pasosParaBajarReps(base, ultima.reps - max, inc));
+  }
+  // Dos al fallo seguidas dentro del rango: la fatiga ya se acumuló.
   if (ultima.rir === 0 && previa?.rir === 0) return bajar("Dos series al fallo seguidas");
   // Al fallo sin llegar al piso del rango: el peso es demasiado para hoy.
   if (ultima.rir === 0 && ultima.reps < min) return bajar(`Al fallo sin llegar a ${min} reps`);
-  if (ultima.rir === 0) return mantener("Al fallo pero dentro del rango");
-  // Techo del rango con margen de sobra: el peso quedó corto.
+  if (ultima.rir === 0) return mantener("Al fallo, justo en el rango");
+  // Justo en el techo con margen de sobra: el peso quedó corto.
   if (ultima.rir >= 3 && ultima.reps >= max) return subir(`${ultima.reps} reps y te sobró margen`);
   // Margen pero sin llegar al techo: primero ganar reps, después peso.
   if (ultima.rir >= 3) return mantener(`Te sobró margen: buscá llegar a ${max} reps`);

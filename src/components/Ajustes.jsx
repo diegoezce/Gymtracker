@@ -28,6 +28,8 @@ import {
   construirSesiones,
   fetchRutina,
   pushRutina,
+  probarConexion,
+  HC_HOST,
 } from "../sync/hcAdapter";
 
 /* ── componentes primitivos ── */
@@ -784,11 +786,18 @@ function SyncPanel({ dias, traerHistorialDeHC, aplicarRutinaDeHC }) {
   const [autoSync, setAutoSync] = useState(leerAutoSync);
   const [rutinaHC, setRutinaHC] = useState(null); // bajada, esperando confirmación de traer
   const [envioPendiente, setEnvioPendiente] = useState(null); // rutina remota que se pisaría al enviar
+  const [diag, setDiag] = useState(null); // resultado de probarConexion()
   const ultimaSync = localStorage.getItem(SYNC_KEY);
 
   function toggleAutoSync(v) {
     localStorage.setItem(AUTOSYNC_KEY, v ? "1" : "0");
     setAutoSync(v);
+  }
+
+  async function diagnosticar() {
+    setEstado("cargando"); setMensaje(""); setDiag(null);
+    setDiag(await probarConexion());
+    setEstado("idle");
   }
 
   async function conectar() {
@@ -900,8 +909,11 @@ function SyncPanel({ dias, traerHistorialDeHC, aplicarRutinaDeHC }) {
 
   return (
     <div style={{ marginTop: 36, paddingTop: 24, borderTop: `1px solid ${C.linea}` }}>
-      <div style={{ fontFamily: SANS, fontSize: 16, fontWeight: 700, color: C.hueso, marginBottom: 16 }}>
+      <div style={{ fontFamily: SANS, fontSize: 16, fontWeight: 700, color: C.hueso, marginBottom: 4 }}>
         Health Monitor
+      </div>
+      <div style={{ fontFamily: MONO, fontSize: 12, color: C.gris, marginBottom: 16 }}>
+        Servidor: <span style={{ color: C.hueso }}>{HC_HOST}</span>
       </div>
 
       {!token ? (
@@ -1013,6 +1025,29 @@ function SyncPanel({ dias, traerHistorialDeHC, aplicarRutinaDeHC }) {
       {mensaje && (
         <div style={{ marginTop: 12, fontFamily: SANS, fontSize: 14, color: estado === "error" ? C.oxido : C.verde }}>
           {mensaje}
+        </div>
+      )}
+
+      {/* Cuando la sync falla, desde la UI se ven iguales tres causas muy
+          distintas: sin red, servidor caído o servidor que bloquea a la app.
+          Este botón las separa sin tener que abrir la consola del browser. */}
+      <div style={{ marginTop: 14 }}>
+        <Boton tono="fantasma" alto={44} onClick={diagnosticar} style={{ opacity: cargando ? 0.5 : 1 }}>
+          Probar conexión
+        </Boton>
+      </div>
+
+      {diag && (
+        <div
+          style={{
+            marginTop: 10,
+            fontFamily: SANS,
+            fontSize: 13,
+            lineHeight: 1.5,
+            color: diag.estado === "ok" ? C.verde : C.oxido,
+          }}
+        >
+          {diag.mensaje}
         </div>
       )}
     </div>

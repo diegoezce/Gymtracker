@@ -25,3 +25,32 @@ export function entradasAVolcar(progreso, { hechos = {}, saltados = {} } = {}) {
     ([id, p]) => p?.series?.length > 0 && !saltados[id] && !hechos[id]
   );
 }
+
+/**
+ * Edita un campo de una serie ya guardada en la sesión en curso.
+ *
+ * Corregir el PESO de la ÚLTIMA serie corrige también `pesoActual`, el
+ * número de la tarjeta. No es cosmético: `guardarSerie` graba la próxima
+ * serie con ese valor, así que si la tarjeta se queda con el peso viejo,
+ * el error que se acaba de corregir se repite en la serie siguiente — y
+ * además la tarjeta pasa a contradecir a la sugerencia, que sí lee las
+ * series.
+ *
+ * Editar una serie anterior no mueve la tarjeta: la última serie sigue
+ * siendo el dato más reciente de con cuánto se está levantando. Editar
+ * reps o segundos tampoco, porque no dicen nada sobre el peso.
+ *
+ * @param {{series: Array, pesoActual: number}} sesion
+ * @param {number} i índice de la serie a editar
+ * @param {string} campo "peso" | "reps" | "segundos"
+ * @param {number} valor
+ */
+export function editarSerie(sesion, i, campo, valor) {
+  const series = (sesion.series ?? []).map((s, idx) => (idx !== i ? s : { ...s, [campo]: valor }));
+  const esUltima = i === series.length - 1;
+  return {
+    ...sesion,
+    series,
+    pesoActual: esUltima && campo === "peso" ? valor : sesion.pesoActual,
+  };
+}

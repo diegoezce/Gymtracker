@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { olvidarProgreso, entradasAVolcar } from "./sesion";
+import { olvidarProgreso, entradasAVolcar, editarSerie } from "./sesion";
 import { agregarEntradaHistorial } from "./rutina";
 
 describe("olvidarProgreso", () => {
@@ -65,5 +65,43 @@ describe("no duplicar series al salir de la sesión", () => {
 
     expect(historial).toHaveLength(1);
     expect(historial[0].series).toEqual([s1, s2, s3]);
+  });
+});
+
+describe("editarSerie", () => {
+  const sesion = (series, pesoActual) => ({ diaId: "a", ejIdx: 0, series, pesoActual });
+
+  it("corrige el peso de la última serie y la tarjeta con la que se grabará la próxima", () => {
+    const r = editarSerie(sesion([{ peso: 76.5, reps: 13, rir: 1 }], 76.5), 0, "peso", 65.25);
+    expect(r.series[0].peso).toBe(65.25);
+    expect(r.pesoActual).toBe(65.25);
+  });
+
+  it("no mueve la tarjeta al editar una serie anterior", () => {
+    const series = [
+      { peso: 60, reps: 10, rir: 2 },
+      { peso: 65, reps: 9, rir: 1 },
+    ];
+    const r = editarSerie(sesion(series, 65), 0, "peso", 62.5);
+    expect(r.series[0].peso).toBe(62.5);
+    expect(r.pesoActual).toBe(65);
+  });
+
+  it("editar reps no toca el peso de la tarjeta", () => {
+    const r = editarSerie(sesion([{ peso: 80, reps: 8, rir: 1 }], 80), 0, "reps", 10);
+    expect(r.series[0].reps).toBe(10);
+    expect(r.pesoActual).toBe(80);
+  });
+
+  it("editar segundos de un ejercicio de tiempo tampoco", () => {
+    const r = editarSerie(sesion([{ segundos: 40 }], 0), 0, "segundos", 45);
+    expect(r.series[0].segundos).toBe(45);
+    expect(r.pesoActual).toBe(0);
+  });
+
+  it("no toca las otras series", () => {
+    const series = [{ peso: 60, reps: 10, rir: 2 }, { peso: 60, reps: 9, rir: 1 }];
+    const r = editarSerie(sesion(series, 60), 1, "peso", 57.5);
+    expect(r.series[0]).toEqual(series[0]);
   });
 });

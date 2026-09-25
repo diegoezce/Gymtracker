@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { progresar, aprender, sugerirPeso } from "./progression";
+import { progresar, aprender, sugerirPeso, describirBase } from "./progression";
 
 function ej(overrides = {}) {
   return {
@@ -305,5 +305,29 @@ describe("sugerirPeso", () => {
   it("usa repsObjetivo cuando no hay rango (datos legados)", () => {
     const legado = ej({ peso: 60, incremento: 2.5, repsObjetivo: 8, repsMin: undefined, repsMax: undefined });
     expect(sugerirPeso(legado, [{ peso: 60, reps: 8, rir: 3 }])).toMatchObject({ peso: 62.5, delta: 2.5 });
+  });
+});
+
+describe("describirBase", () => {
+  it("nombra la serie sobre la que se calculó la sugerencia", () => {
+    expect(describirBase([{ peso: 74, reps: 11, rir: 1 }])).toBe("Serie 1: 74 kg × 11 reps");
+  });
+
+  it("numera según cuántas series van hechas", () => {
+    const series = [
+      { peso: 86, reps: 10, rir: 2 },
+      { peso: 86, reps: 10, rir: 1 },
+    ];
+    expect(describirBase(series)).toBe("Serie 2: 86 kg × 10 reps");
+  });
+
+  it("marca el fallo, que es lo que cambia la regla", () => {
+    expect(describirBase([{ peso: 88, reps: 8, rir: 0 }])).toBe("Serie 1: 88 kg × 8 reps · al fallo");
+  });
+
+  it("no inventa nada si no hay series o están incompletas", () => {
+    expect(describirBase([])).toBeNull();
+    expect(describirBase(undefined)).toBeNull();
+    expect(describirBase([{ segundos: 40 }])).toBeNull();
   });
 });

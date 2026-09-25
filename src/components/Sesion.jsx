@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { C, MONO, SANS } from "../theme";
 import { barra } from "../styles/helpers";
 import { fmt, hoy } from "../utils/format";
-import { sugerirPeso } from "../domain/progression";
+import { describirBase, sugerirPeso } from "../domain/progression";
 import { Marco } from "./Marco";
 import { Cabecera } from "./Cabecera";
 import { Etiqueta } from "./Etiqueta";
@@ -187,6 +187,9 @@ export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarSerieT
   // Sólo tiene sentido si queda al menos una serie por hacer.
   const sugerencia = hayMasSeries ? sugerirPeso(ej, sesion.series) : null;
   const aplicarSugerencia = () => setSesion({ ...sesion, pesoActual: sugerencia.peso });
+  // De qué serie salió: sin esto, un peso sugerido que no cuadra con la
+  // tarjeta no se puede explicar desde la pantalla.
+  const baseSugerencia = sugerencia ? describirBase(sesion.series) : null;
 
   // Re-schedule SW notification when mounting with a restored timer
   useEffect(() => {
@@ -382,10 +385,18 @@ export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarSerieT
                 <div style={{ fontFamily: SANS, fontSize: 12, color: C.gris, marginTop: 3 }}>
                   {sugerencia.motivo}
                 </div>
+                {baseSugerencia && (
+                  <div style={{ fontFamily: MONO, fontSize: 11, color: C.gris, marginTop: 4, opacity: 0.8 }}>
+                    {baseSugerencia}
+                  </div>
+                )}
               </button>
             ) : (
               <div style={{ fontFamily: SANS, fontSize: 12, color: C.gris, padding: "2px 2px 0" }}>
                 {sugerencia.delta === 0 ? "Mantené este peso" : "Peso sugerido"} · {sugerencia.motivo}
+                {baseSugerencia && (
+                  <div style={{ fontFamily: MONO, fontSize: 11, marginTop: 4, opacity: 0.8 }}>{baseSugerencia}</div>
+                )}
               </div>
             )
           )}

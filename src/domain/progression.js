@@ -143,6 +143,26 @@ export function sugerirPeso(ej, seriesHechas) {
 }
 
 /**
+ * De qué serie sale la sugerencia, en palabras.
+ *
+ * El motivo solo ("Vas en el rango") no dice sobre qué datos se calculó, y
+ * el peso sugerido sale de la última serie hecha, no del que muestra la
+ * tarjeta. Cuando esos dos números no coinciden —porque la serie se editó,
+ * o porque la tarjeta arrastra el peso de la plantilla— sin esta línea no
+ * hay forma de darse cuenta desde la pantalla.
+ *
+ * @param {Array<{peso: number, reps: number, rir: number}>} seriesHechas
+ * @returns {string | null}
+ */
+export function describirBase(seriesHechas) {
+  if (!seriesHechas?.length) return null;
+  const i = seriesHechas.length;
+  const s = seriesHechas[i - 1];
+  if (s?.peso == null || s?.reps == null) return null;
+  return `Serie ${i}: ${fmt(s.peso)} kg × ${s.reps} reps${s.rir === 0 ? " · al fallo" : ""}`;
+}
+
+/**
  * Aprende de cuándo el usuario le pisa la sugerencia de peso: si ajusta
  * manualmente en la misma dirección 3 veces seguidas, recalibra el salto.
  *

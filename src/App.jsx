@@ -185,7 +185,11 @@ export default function App() {
     });
     nuevos = marcarSesionDia(nuevos, dia.id, hoy());
     setDias(nuevos);
-    setAviso(av || nota);
+    // Con el nombre adelante. El aviso se muestra en Inicio (ver el render
+    // al final del archivo), que es donde caés al pausar la sesión: para
+    // entonces ya cerraste varios ejercicios y "Repetimos 80 kg" a secas no
+    // dice de cuál habla.
+    setAviso(`${ej.nombre}: ${av || nota}`);
     syncSilencioso(nuevos);
     setSesion({
       ...sesion,
@@ -214,7 +218,7 @@ export default function App() {
     });
     nuevos = marcarSesionDia(nuevos, dia.id, hoy());
     setDias(nuevos);
-    setAviso(nota);
+    setAviso(`${ej.nombre}: ${nota}`);
     syncSilencioso(nuevos);
     setSesion({
       ...sesion,
@@ -277,6 +281,7 @@ export default function App() {
     }
     if (!huboActividad) {
       setSesion(null);
+      setAviso("");
       setPantalla("inicio");
       return;
     }
@@ -289,6 +294,11 @@ export default function App() {
   // durante la sesión como los parciales que se vuelcan al salir.
   const terminarConResumen = (diasFinales) => {
     setSesion(null);
+    // El aviso sirve mientras la sesión está en curso (al pausarla se ve en
+    // Inicio); una vez terminada queda colgado ahí hasta que empiece la
+    // próxima, hablando de un solo ejercicio y pisado por el resumen, que
+    // cuenta lo mismo pero completo.
+    setAviso("");
     const r = resumenSesion(diasFinales, hoy());
     setResumen(r);
     setPantalla(r ? "resumen" : "inicio");

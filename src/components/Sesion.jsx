@@ -245,6 +245,18 @@ export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarSerieT
     prevSeg.current = null;
   };
 
+  // Descanso a pedido. El timer arranca solo al guardar una serie, pero hay
+  // veces que hace falta parar igual: antes de la primera, después de la
+  // última, o cuando una serie salió más dura de lo previsto. Usa el mismo
+  // descanso configurado del ejercicio y la misma notificación.
+  const iniciarDescanso = () => {
+    const fin = Date.now() + ej.descanso * 1000;
+    setTimerFin(fin);
+    setTimerSeg(ej.descanso);
+    prevSeg.current = ej.descanso;
+    programarNotificacion(ej.id, fin);
+  };
+
   const [editandoIdx, setEditandoIdx] = useState(null);
   const [modalTecnica, setModalTecnica] = useState(false);
   const tieneTecnica = ej.tecnica?.trim() || ej.imagenUrl?.trim();
@@ -406,6 +418,11 @@ export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarSerieT
           )}
 
           <div style={{ marginTop: 28, display: "flex", flexDirection: "column", gap: 8 }}>
+            {timerSeg === null && ej.descanso > 0 && (
+              <Boton tono="fantasma" alto={46} onClick={iniciarDescanso}>
+                Descansar {ej.descanso}s
+              </Boton>
+            )}
             {sesion.series.length > 0 && (
               <Boton tono="fuerte" alto={50} onClick={() => { cancelarNotificacion(ej.id); terminarEjercicio(); }}>
                 Terminar ejercicio

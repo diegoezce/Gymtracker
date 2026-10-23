@@ -3,6 +3,7 @@ import { C, MONO, SANS } from "../theme";
 import { barra } from "../styles/helpers";
 import { fmt, hoy } from "../utils/format";
 import { describirBase, sugerirPeso } from "../domain/progression";
+import { tieneImagen } from "../domain/imagen";
 import { editarSerie as editarSerieEnSesion } from "../domain/sesion";
 import { Marco } from "./Marco";
 import { Cabecera } from "./Cabecera";
@@ -259,7 +260,7 @@ export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarSerieT
 
   const [editandoIdx, setEditandoIdx] = useState(null);
   const [modalTecnica, setModalTecnica] = useState(false);
-  const tieneTecnica = ej.tecnica?.trim() || ej.imagenUrl?.trim();
+  const tieneTecnica = ej.tecnica?.trim() || tieneImagen(ej);
 
   const editarSerie = (i, campo, valor) => setSesion(editarSerieEnSesion(sesion, i, campo, valor));
 

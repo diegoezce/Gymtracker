@@ -13,6 +13,10 @@ import {
   fusionarDias,
   eliminarEjercicioDeTodos,
 } from "../domain/rutina";
+import { achicar, faltaSubir, tieneImagen } from "../domain/imagen";
+import { borrarFoto, guardarFoto, leerFoto, nuevoId } from "../storage/fotosLocal";
+import { borrarRemota, subirFoto } from "../sync/fotos";
+import { FotoEjercicio } from "./FotoEjercicio";
 import { Marco } from "./Marco";
 import { Cabecera } from "./Cabecera";
 import { Boton } from "./Boton";
@@ -152,6 +156,7 @@ function CamposTecnica({ ej, onEditar }) {
           }}
         />
       </div>
+      <FotoTecnica ej={ej} onEditar={onEditar} />
       <div>
         <Label>URL de imagen (opcional)</Label>
         <input
@@ -175,6 +180,166 @@ function CamposTecnica({ ej, onEditar }) {
         />
       </div>
     </>
+  );
+}
+
+/**
+ * Foto de técnica sacada con la cámara del teléfono.
+ *
+ * El orden importa: primero se achica y se guarda en el teléfono, y recién
+ * después se intenta subir. Así la foto ya sirve aunque no haya red, no
+ * haya token, o el servidor todavía no tenga el endpoint — lo único que
+ * falta en esos casos es el respaldo, y se puede reintentar.
+ */
+function FotoTecnica({ ej, onEditar }) {
+  const [estado, setEstado] = useState("idle"); // idle | procesando | subiendo | error
+  const [mensaje, setMensaje] = useState("");
+  const archivoRef = useRef(null);
+  const ocupado = estado === "procesando" || estado === "subiendo";
+
+  async function subir(id, blob) {
+    const token = leerToken();
+    if (!token) {
+      setEstado("idle");
+      setMensaje("Guardada en el teléfono. Conectá Health Monitor para respaldarla.");
+      return;
+    }
+    setEstado("subiendo");
+    try {
+      onEditar({ imagenId: id, imagenKey: await subirFoto(token, blob) });
+      setEstado("idle");
+      setMensaje("Guardada y respaldada.");
+    } catch (e) {
+      setEstado("idle");
+      setMensaje(`Guardada en el teléfono. No se pudo respaldar: ${e.message}`);
+    }
+  }
+
+  async function elegir(ev) {
+    const file = ev.target.files?.[0];
+    ev.target.value = ""; // sin esto, volver a elegir la misma foto no dispara nada
+    if (!file) return;
+    setEstado("procesando");
+    setMensaje("");
+    try {
+      const blob = await achicar(file);
+      // Reusar el id si ya había foto: la entrada vieja de IndexedDB se
+      // reemplaza en vez de quedar huérfana ocupando lugar.
+      const id = ej.imagenId ?? nuevoId();
+      await guardarFoto(id, blob);
+      onEditar({ imagenId: id, imagenKey: null }); // la remota, si había, ya no corresponde
+      await subir(id, blob);
+    } catch (e) {
+      setEstado("error");
+      setMensaje(`No se pudo procesar la foto: ${e.message}`);
+    }
+  }
+
+  async function reintentar() {
+    const blob = await leerFoto(ej.imagenId);
+    if (!blob) {
+      setMensaje("La foto ya no está en este teléfono.");
+      return;
+    }
+    await subir(ej.imagenId, blob);
+  }
+
+  async function quitar() {
+    const { imagenId, imagenKey } = ej;
+    onEditar({ imagenId: null, imagenKey: null });
+    setMensaje("");
+    setEstado("idle");
+    if (imagenId) borrarFoto(imagenId);
+    const token = leerToken();
+    // Si falla, queda un objeto huérfano de ~100 KB en R2. Prefiero eso a
+    // trabar la UI por algo que el usuario no puede resolver.
+    if (imagenKey && token) borrarRemota(token, imagenKey).catch(() => {});
+  }
+
+  return (
+    <div>
+      <Label>Foto de técnica</Label>
+      {tieneImagen(ej) && (
+        <FotoEjercicio
+          ej={ej}
+          style={{ width: "100%", maxHeight: 180, objectFit: "cover", borderRadius: 4, marginBottom: 8 }}
+        />
+      )}
+      <input
+        ref={archivoRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={elegir}
+        style={{ display: "none" }}
+      />
+      <div style={{ display: "flex", gap: 8 }}>
+        <button
+          onClick={() => archivoRef.current?.click()}
+          disabled={ocupado}
+          style={{
+            flex: 1,
+            background: C.sup2,
+            color: C.hueso,
+            border: `1px solid ${C.linea}`,
+            borderRadius: 4,
+            padding: "10px 12px",
+            fontFamily: SANS,
+            fontSize: 14,
+            cursor: ocupado ? "default" : "pointer",
+            opacity: ocupado ? 0.5 : 1,
+          }}
+        >
+          {estado === "procesando"
+            ? "Procesando…"
+            : estado === "subiendo"
+              ? "Subiendo…"
+              : ej.imagenId
+                ? "Cambiar foto"
+                : "Sacar foto"}
+        </button>
+        {ej.imagenId && (
+          <button
+            onClick={quitar}
+            disabled={ocupado}
+            style={{
+              background: "none",
+              color: C.gris,
+              border: `1px solid ${C.linea}`,
+              borderRadius: 4,
+              padding: "10px 12px",
+              fontFamily: SANS,
+              fontSize: 14,
+              cursor: "pointer",
+            }}
+          >
+            Quitar
+          </button>
+        )}
+      </div>
+      {faltaSubir(ej) && !ocupado && (
+        <button
+          onClick={reintentar}
+          style={{
+            marginTop: 6,
+            background: "none",
+            border: "none",
+            color: C.sodio,
+            fontFamily: SANS,
+            fontSize: 12,
+            padding: 0,
+            cursor: "pointer",
+          }}
+        >
+          Sólo está en el teléfono · reintentar respaldo
+        </button>
+      )}
+      {mensaje && (
+        <div style={{ marginTop: 6, fontFamily: SANS, fontSize: 12, color: estado === "error" ? C.oxido : C.gris }}>
+          {mensaje}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1326,7 +1491,7 @@ function SelectorFusionDia({ dia, candidatos, onConfirmar, volver }) {
 
 // Campos compartidos entre copias del mismo ejercicio en distintos días —
 // ver actualizarCompartido en domain/rutina.js.
-const CAMPOS_COMPARTIDOS = new Set(["nombre", "peso", "incremento", "repsObjetivo", "duracionObjetivo", "tecnica", "imagenUrl"]);
+const CAMPOS_COMPARTIDOS = new Set(["nombre", "peso", "incremento", "repsObjetivo", "duracionObjetivo", "tecnica", "imagenUrl", "imagenId", "imagenKey"]);
 
 export function Ajustes({ dias, setDias, agregarEjercicioADia, traerHistorialDeHC, aplicarRutinaDeHC, onImportarRutina, volver }) {
   const [agregandoEnDia, setAgregandoEnDia] = useState(null);
@@ -1339,12 +1504,18 @@ export function Ajustes({ dias, setDias, agregarEjercicioADia, traerHistorialDeH
   const estaColapsado = (diaId) => colapsados[diaId] ?? true;
   const toggleColapsado = (diaId) => setColapsados((c) => ({ ...c, [diaId]: !estaColapsado(diaId) }));
 
+  // Un campo suelto —editar("peso", 80)— o varios de una —editar({ imagenId,
+  // imagenKey }). La foto necesita lo segundo: dos llamadas seguidas se
+  // pisarían, porque la segunda parte del mismo `dias` del render que la
+  // primera. Un objeto tiene que traer sólo campos compartidos o sólo
+  // propios del día, no mezclados.
   const editar = (diaId, ejId, campo, valor) => {
-    if (CAMPOS_COMPARTIDOS.has(campo)) {
-      setDias(actualizarCompartido(dias, ejId, { [campo]: valor }));
+    const campos = typeof campo === "object" ? campo : { [campo]: valor };
+    if (Object.keys(campos).every((k) => CAMPOS_COMPARTIDOS.has(k))) {
+      setDias(actualizarCompartido(dias, ejId, campos));
     } else {
       setDias(dias.map((d) =>
-        d.id !== diaId ? d : { ...d, ejercicios: d.ejercicios.map((e) => (e.id !== ejId ? e : { ...e, [campo]: valor })) }
+        d.id !== diaId ? d : { ...d, ejercicios: d.ejercicios.map((e) => (e.id !== ejId ? e : { ...e, ...campos })) }
       ));
     }
   };

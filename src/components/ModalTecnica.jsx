@@ -1,10 +1,12 @@
 import { C, SANS } from "../theme";
+import { tieneImagen } from "../domain/imagen";
+import { FotoEjercicio } from "./FotoEjercicio";
 
 export function ModalTecnica({ ej, onCerrar }) {
-  const tieneTecnica = ej.tecnica?.trim();
-  const tieneImagen = ej.imagenUrl?.trim();
+  const tieneTexto = ej.tecnica?.trim();
+  const hayImagen = tieneImagen(ej);
 
-  if (!tieneTecnica && !tieneImagen) return null;
+  if (!tieneTexto && !hayImagen) return null;
 
   return (
     <div
@@ -39,14 +41,13 @@ export function ModalTecnica({ ej, onCerrar }) {
         </div>
 
         {/* imagen */}
-        {tieneImagen && (
-          <img
-            src={ej.imagenUrl}
-            alt={ej.nombre}
+        {hayImagen && (
+          <FotoEjercicio
+            ej={ej}
             style={{
               width: "100%",
               borderRadius: 8,
-              marginBottom: tieneTecnica ? 16 : 0,
+              marginBottom: tieneTexto ? 16 : 0,
               objectFit: "cover",
               maxHeight: 240,
             }}
@@ -54,7 +55,7 @@ export function ModalTecnica({ ej, onCerrar }) {
         )}
 
         {/* técnica */}
-        {tieneTecnica && (
+        {tieneTexto && (
           <div style={{
             fontFamily: SANS,
             fontSize: 15,

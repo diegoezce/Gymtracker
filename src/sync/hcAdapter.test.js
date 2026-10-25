@@ -360,3 +360,45 @@ describe("construirSesiones: duración estimada", () => {
     expect(sesion.duracion_min).toBe(23); // 20 min cardio + 3 min estimados de fuerza
   });
 });
+
+describe("aplicarSesiones — match de nombres tolerante", () => {
+  const conNombre = (nombre) => [
+    {
+      id: "a",
+      nombre: "Día A",
+      ejercicios: [{ id: "x", nombre, peso: 10, series: 3, historial: [] }],
+    },
+  ];
+  const sesion = (nombre) => [
+    {
+      fecha: "2026-10-21",
+      dia: "Día A",
+      ejercicios: [{ nombre, series: [{ peso: 11, reps: 12, rir: 1 }] }],
+    },
+  ];
+  const historialDe = (dias) => dias[0].ejercicios[0].historial;
+
+  it("recupera el historial aunque el nombre traiga un espacio de más", () => {
+    const dias = aplicarSesiones(conNombre("Face pull en polea"), sesion("Face pull en polea "));
+    expect(historialDe(dias)).toHaveLength(1);
+  });
+
+  it("y aunque difiera en mayúsculas", () => {
+    const dias = aplicarSesiones(conNombre("Face pull en polea"), sesion("Face Pull En Polea"));
+    expect(historialDe(dias)).toHaveLength(1);
+  });
+
+  it("y aunque la tilde esté codificada distinto (NFC vs NFD)", () => {
+    // El caso que de verdad se cuela al pegar JSON editado fuera de la app.
+    const dias = aplicarSesiones(
+      conNombre("Extensión tríceps".normalize("NFC")),
+      sesion("Extensión tríceps".normalize("NFD"))
+    );
+    expect(historialDe(dias)).toHaveLength(1);
+  });
+
+  it("pero no se trae el historial de otro ejercicio", () => {
+    const dias = aplicarSesiones(conNombre("Plancha frontal"), sesion("Plancha lateral"));
+    expect(historialDe(dias)).toHaveLength(0);
+  });
+});

@@ -1,4 +1,5 @@
 import { diasDondeAparece } from "../domain/rutina";
+import { mismoNombre } from "../domain/nombre";
 
 const HC_URL = "https://hm.sparkio.me";
 export const HC_HOST = HC_URL.replace(/^https?:\/\//, "");
@@ -144,9 +145,13 @@ export function aplicarSesiones(dias, sesiones) {
       const esCompartido = diasDondeAparece(dias, ej.id).length > 1;
       const sesionesDelDia = esCompartido ? sesiones : sesiones.filter((s) => s.dia === dia.nombre);
 
-      // Entradas que HC tiene para este ejercicio (match por nombre)
+      // Entradas que HC tiene para este ejercicio. El match es por nombre
+      // normalizado y no por string exacto: la sesión no guarda el id, así
+      // que el nombre es el único vínculo, y un espacio de más o una tilde
+      // codificada distinta —invisibles en pantalla— dejarían al ejercicio
+      // sin recuperar nada. Ver domain/nombre.js.
       const desdeHC = sesionesDelDia.flatMap((s) => {
-        const ejHC = s.ejercicios.find((e) => e.nombre === ej.nombre);
+        const ejHC = s.ejercicios.find((e) => mismoNombre(e.nombre, ej.nombre));
         if (!ejHC) return [];
         return [
           ej.tipo === "cardio"

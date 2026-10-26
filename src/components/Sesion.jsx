@@ -300,7 +300,13 @@ export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarSerieT
             )}
           </div>
           <Etiqueta>
-            Serie {sesion.series.length + 1} de {objetivoSeries} · objetivo{" "}
+            {/* Al reabrir un ejercicio ya cerrado las series hechas pueden
+                igualar o superar al objetivo, y "serie 5 de 4" se lee como
+                un error. En ese caso la que viene es una serie extra. */}
+            {sesion.series.length >= objetivoSeries
+              ? `Serie ${sesion.series.length + 1} · extra`
+              : `Serie ${sesion.series.length + 1} de ${objetivoSeries}`}{" "}
+            · objetivo{" "}
             {esTiempo
               ? `${ej.duracionObjetivo}s`
               : `${ej.repsMax ? `${ej.repsObjetivo}–${ej.repsMax}` : ej.repsObjetivo} reps`}

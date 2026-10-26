@@ -70,6 +70,7 @@ export function DiaMenu({
   progreso = {},
   saltados = {},
   onEjercicio,
+  onReabrir,
   onAlternarSaltado,
   onTerminar,
   onPausar,
@@ -137,7 +138,7 @@ export function DiaMenu({
                 }}
               >
                 <button
-                  onClick={() => !hecho && !saltado && onEjercicio(idx)}
+                  onClick={() => (hecho ? onReabrir(idx) : !saltado && onEjercicio(idx))}
                   style={{
                     flex: 1,
                     minWidth: 0,
@@ -145,7 +146,7 @@ export function DiaMenu({
                     background: "none",
                     border: "none",
                     padding: "16px 4px 16px 18px",
-                    cursor: hecho || saltado ? "default" : "pointer",
+                    cursor: saltado ? "default" : "pointer",
                     WebkitTapHighlightColor: "transparent",
                   }}
                 >
@@ -162,7 +163,7 @@ export function DiaMenu({
                       {e.nombre}
                     </span>
                     {hecho ? (
-                      <span style={{ ...ESTADO_DER, color: C.verde }}>✓</span>
+                      <span style={{ ...ESTADO_DER, color: C.verde }}>✓ hecho</span>
                     ) : saltado ? (
                       <span style={{ ...ESTADO_DER, color: C.gris }}>saltado</span>
                     ) : parcial ? (
@@ -192,8 +193,12 @@ export function DiaMenu({
                       ? `${e.series} × ${e.duracionObjetivo}s${e.descanso ? ` · ${e.descanso}s descanso` : ""}`
                       : `${e.series} × ${e.repsMax ? `${e.repsMin}–${e.repsMax}` : e.repsObjetivo} reps${e.descanso ? ` · ${e.descanso}s` : ""}`}
                   </div>
-                  <div style={{ fontFamily: MONO, fontSize: 11, color: C.gris, marginTop: 3, opacity: 0.75 }}>
-                    {ultima ? `última vez: ${diasDesdeStr(ultima.fecha)}` : "todavía no hecho"}
+                  <div style={{ fontFamily: MONO, fontSize: 11, color: hecho ? C.sodio : C.gris, marginTop: 3, opacity: 0.75 }}>
+                    {hecho
+                      ? "tocá para agregar una serie"
+                      : ultima
+                      ? `última vez: ${diasDesdeStr(ultima.fecha)}`
+                      : "todavía no hecho"}
                   </div>
                 </button>
 

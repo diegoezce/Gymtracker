@@ -54,3 +54,64 @@ export function editarSerie(sesion, i, campo, valor) {
     pesoActual: esUltima && campo === "peso" ? valor : sesion.pesoActual,
   };
 }
+
+// Campos que `cerrarEjercicio` pisa al cerrar un ejercicio: la progresión
+// calculada a partir de las series hechas. Se guardan en `sesion.cerrados`
+// para poder volver atrás si el cierre fue un error.
+const CAMPOS_DE_CIERRE = ["peso", "repsObjetivo", "incremento", "ajustes", "duracionObjetivo"];
+
+/**
+ * Foto de un ejercicio justo antes de cerrarlo.
+ *
+ * Sólo copia los campos que existen: restaurar `duracionObjetivo: undefined`
+ * sobre un ejercicio de fuerza le agregaría la clave con valor vacío.
+ */
+export function instantaneaCierre(ej) {
+  const foto = {};
+  CAMPOS_DE_CIERRE.forEach((k) => {
+    if (ej?.[k] !== undefined) foto[k] = ej[k];
+  });
+  return foto;
+}
+
+/**
+ * Deshace el cierre de un ejercicio para poder seguir agregándole series.
+ *
+ * Es un *undo*, no una edición: saca la entrada de hoy del historial y la
+ * devuelve a la sesión. Tiene que ser así porque `agregarEntradaHistorial`
+ * concatena las series cuando ya hay una entrada de esa fecha — reabrir sin
+ * sacarla duplicaría todo lo ya hecho al cerrar de nuevo. Y porque esa
+ * concatenación es la que necesita un ejercicio compartido entrenado dos
+ * veces el mismo día, no se puede cambiar por un reemplazo.
+ *
+ * Restaura además la progresión que el cierre ya había aplicado, así cerrar
+ * dos veces no sube el peso dos veces ni acumula dos ajustes por la misma
+ * sesión.
+ *
+ * @returns {{ campos: object, sesion: object }} campos para actualizarCompartido
+ */
+export function reabrirEjercicio(sesion, ej, fecha) {
+  const historial = ej.historial ?? [];
+  const entrada = historial.find((h) => h.fecha === fecha);
+  const { [ej.id]: foto, ...cerrados } = sesion.cerrados ?? {};
+  const { [ej.id]: _hecho, ...hechos } = sesion.hechos ?? {};
+
+  const series = entrada?.series ?? [];
+  const ultima = series[series.length - 1];
+
+  return {
+    campos: {
+      ...(foto ?? {}),
+      historial: historial.filter((h) => h.fecha !== fecha),
+    },
+    sesion: {
+      ...sesion,
+      series,
+      // La tarjeta arranca en lo último que levantó, no en el peso de la
+      // plantilla: la serie que viene es la continuación de esas.
+      pesoActual: ultima?.peso ?? foto?.peso ?? ej.peso ?? 0,
+      hechos,
+      cerrados,
+    },
+  };
+}

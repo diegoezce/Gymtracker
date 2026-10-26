@@ -3,7 +3,7 @@ import { storage, CLAVE_RUTINA, CLAVE_SESION } from "./storage";
 import { RUTINA_INICIAL, actualizarCompartido, vincularEjercicio, resincronizarCompartidos, agregarEntradaHistorial, editarEntradaHistorial, eliminarEntradaHistorial, fusionarEjercicios, marcarSesionDia } from "./domain/rutina";
 import { leerToken, leerAutoSync, fetchSesiones, aplicarSesiones, pushSesiones, construirSesiones, fetchRutina, aplicarRutina, SYNC_KEY, TOKEN_KEY } from "./sync/hcAdapter";
 import { progresar, aprender } from "./domain/progression";
-import { olvidarProgreso, entradasAVolcar } from "./domain/sesion";
+import { olvidarProgreso, entradasAVolcar, instantaneaCierre, reabrirEjercicio as deshacerCierre } from "./domain/sesion";
 import { resumenSesion } from "./domain/resumen";
 import { hoy } from "./utils/format";
 import { Marco } from "./components/Marco";
@@ -120,7 +120,7 @@ export default function App() {
   const comenzar = (dia) => {
     setAviso("");
     setSesionPausada(false);
-    setSesion({ diaId: dia.id, ejIdx: null, pesoActual: 0, series: [], hechos: {}, progreso: {}, saltados: {}, extra: {} });
+    setSesion({ diaId: dia.id, ejIdx: null, pesoActual: 0, series: [], hechos: {}, progreso: {}, saltados: {}, extra: {}, cerrados: {} });
   };
 
   // Pausar: vuelve a Inicio sin tocar la sesión — queda intacta (en memoria
@@ -146,6 +146,18 @@ export default function App() {
     });
   };
 
+  // Reabre un ejercicio cerrado por error, para poder agregarle una serie
+  // más. No edita la entrada: la saca del historial y la devuelve a la
+  // sesión, porque agregarEntradaHistorial concatena series cuando ya hay
+  // una entrada de esa fecha (ver domain/sesion.js). No sincroniza: lo que
+  // valga esa fecha se define al volver a cerrar, o al salir de la sesión.
+  const reabrirEjercicio = (idx) => {
+    const e = dia.ejercicios[idx];
+    const { campos, sesion: reabierta } = deshacerCierre(sesion, e, hoy());
+    setDias(actualizarCompartido(dias, e.id, campos));
+    setSesion({ ...reabierta, ejIdx: idx });
+  };
+
   const guardarCardio = (duracion, distancia) => {
     let nuevos = actualizarCompartido(dias, ej.id, {
       historial: agregarEntradaHistorial(ej.historial, { fecha: hoy(), duracion, distancia }),
@@ -153,7 +165,13 @@ export default function App() {
     nuevos = marcarSesionDia(nuevos, dia.id, hoy());
     setDias(nuevos);
     syncSilencioso(nuevos);
-    setSesion({ ...sesion, ejIdx: null, series: [], hechos: { ...sesion.hechos, [ej.id]: true } });
+    setSesion({
+      ...sesion,
+      ejIdx: null,
+      series: [],
+      hechos: { ...sesion.hechos, [ej.id]: true },
+      cerrados: { ...sesion.cerrados, [ej.id]: instantaneaCierre(ej) },
+    });
   };
 
   // Serie extra = "puedo una más, ahora". Sólo estado de sesión — ej.series
@@ -196,6 +214,9 @@ export default function App() {
       ejIdx: null,
       series: [],
       hechos: { ...sesion.hechos, [ej.id]: true },
+      // Para poder deshacer el cierre si fue sin querer: guarda la
+      // progresión que se acaba de aplicar, antes de pisarla.
+      cerrados: { ...sesion.cerrados, [ej.id]: instantaneaCierre(ej) },
       progreso: olvidarProgreso(sesion.progreso, ej.id),
     });
   };
@@ -225,6 +246,7 @@ export default function App() {
       ejIdx: null,
       series: [],
       hechos: { ...sesion.hechos, [ej.id]: true },
+      cerrados: { ...sesion.cerrados, [ej.id]: instantaneaCierre(ej) },
       progreso: olvidarProgreso(sesion.progreso, ej.id),
     });
   };
@@ -400,6 +422,7 @@ export default function App() {
         progreso={sesion.progreso ?? {}}
         saltados={sesion.saltados ?? {}}
         onEjercicio={iniciarEjercicio}
+        onReabrir={reabrirEjercicio}
         onAlternarSaltado={alternarSaltado}
         onTerminar={salirSesion}
         onPausar={pausarSesion}

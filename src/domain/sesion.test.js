@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { olvidarProgreso, entradasAVolcar, editarSerie } from "./sesion";
+import { olvidarProgreso, entradasAVolcar, editarSerie, instantaneaCierre, reabrirEjercicio } from "./sesion";
 import { agregarEntradaHistorial } from "./rutina";
 
 describe("olvidarProgreso", () => {
@@ -103,5 +103,101 @@ describe("editarSerie", () => {
     const series = [{ peso: 60, reps: 10, rir: 2 }, { peso: 60, reps: 9, rir: 1 }];
     const r = editarSerie(sesion(series, 60), 1, "peso", 57.5);
     expect(r.series[0]).toEqual(series[0]);
+  });
+});
+
+describe("reabrirEjercicio", () => {
+  const HOY = "2026-10-26";
+  const ejercicio = (extra = {}) => ({
+    id: "prensa",
+    nombre: "Prensa",
+    peso: 86,
+    repsObjetivo: 10,
+    incremento: 0.5,
+    ajustes: [1],
+    historial: [
+      { fecha: "2026-10-21", series: [{ peso: 80, reps: 10, rir: 1 }] },
+      { fecha: HOY, series: [{ peso: 86, reps: 10, rir: 1 }, { peso: 86, reps: 10, rir: 1 }] },
+    ],
+    ...extra,
+  });
+  const sesionCerrada = (foto) => ({
+    diaId: "a",
+    ejIdx: null,
+    series: [],
+    pesoActual: 0,
+    hechos: { prensa: true, otro: true },
+    cerrados: { prensa: foto },
+  });
+
+  it("devuelve las series de hoy a la sesión", () => {
+    const { sesion } = reabrirEjercicio(sesionCerrada({}), ejercicio(), HOY);
+    expect(sesion.series).toHaveLength(2);
+  });
+
+  it("saca la entrada de hoy del historial, para que cerrar de nuevo no duplique", () => {
+    // agregarEntradaHistorial CONCATENA series si ya hay entrada de esa
+    // fecha: si la dejáramos, al cerrar quedarían las dos viejas repetidas.
+    const { campos } = reabrirEjercicio(sesionCerrada({}), ejercicio(), HOY);
+    expect(campos.historial.map((h) => h.fecha)).toEqual(["2026-10-21"]);
+  });
+
+  it("restaura la progresión que el cierre había aplicado", () => {
+    // Cerró con "todas al tope" y subió de 84 a 86. Reabrir vuelve a 84,
+    // así el segundo cierre no suma otro incremento por la misma sesión.
+    const foto = { peso: 84, repsObjetivo: 12, incremento: 0.5, ajustes: [] };
+    const { campos } = reabrirEjercicio(sesionCerrada(foto), ejercicio(), HOY);
+    expect(campos).toMatchObject(foto);
+  });
+
+  it("deja de marcarlo como hecho, sin tocar a los demás", () => {
+    const { sesion } = reabrirEjercicio(sesionCerrada({}), ejercicio(), HOY);
+    expect(sesion.hechos).toEqual({ otro: true });
+  });
+
+  it("olvida la foto una vez usada", () => {
+    const { sesion } = reabrirEjercicio(sesionCerrada({}), ejercicio(), HOY);
+    expect(sesion.cerrados).toEqual({});
+  });
+
+  it("la tarjeta arranca en el peso de la última serie, no en el de la plantilla", () => {
+    const ej = ejercicio();
+    ej.historial[1].series.push({ peso: 74, reps: 8, rir: 0 });
+    const { sesion } = reabrirEjercicio(sesionCerrada({ peso: 84 }), ej, HOY);
+    expect(sesion.pesoActual).toBe(74);
+  });
+
+  it("no rompe si el ejercicio no tiene entrada de hoy", () => {
+    const ej = ejercicio();
+    ej.historial = ej.historial.filter((h) => h.fecha !== HOY);
+    const { campos, sesion } = reabrirEjercicio(sesionCerrada({ peso: 84 }), ej, HOY);
+    expect(sesion.series).toEqual([]);
+    expect(campos.historial).toHaveLength(1);
+    expect(sesion.pesoActual).toBe(84);
+  });
+
+  it("no toca las entradas de otras fechas", () => {
+    const { campos } = reabrirEjercicio(sesionCerrada({}), ejercicio(), HOY);
+    expect(campos.historial[0].series).toEqual([{ peso: 80, reps: 10, rir: 1 }]);
+  });
+});
+
+describe("instantaneaCierre", () => {
+  it("copia los campos que el cierre va a pisar", () => {
+    const ej = { peso: 84, repsObjetivo: 12, incremento: 0.5, ajustes: [1], nombre: "Prensa" };
+    expect(instantaneaCierre(ej)).toEqual({ peso: 84, repsObjetivo: 12, incremento: 0.5, ajustes: [1] });
+  });
+
+  it("no inventa campos que el ejercicio no tiene", () => {
+    // Restaurar duracionObjetivo: undefined sobre un ejercicio de fuerza
+    // le agregaría la clave vacía.
+    expect(instantaneaCierre({ peso: 10 })).toEqual({ peso: 10 });
+  });
+
+  it("guarda la duración en los ejercicios de tiempo", () => {
+    expect(instantaneaCierre({ duracionObjetivo: 40, incremento: 5 })).toEqual({
+      duracionObjetivo: 40,
+      incremento: 5,
+    });
   });
 });

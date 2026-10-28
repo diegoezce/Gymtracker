@@ -115,3 +115,47 @@ export function reabrirEjercicio(sesion, ej, fecha) {
     },
   };
 }
+
+// ── reloj de la sesión ────────────────────────────────────────────
+//
+// Hasta ahora la duración que se mandaba a HM era una fórmula sobre el
+// historial (45 s por serie + el descanso configurado). Esto mide el tiempo
+// de verdad: arranca al empezar la sesión y para al terminarla.
+//
+// Acumula tiempo ACTIVO, no reloj de pared: al pausar se guarda lo corrido
+// y el reloj se detiene, así una sesión pausada a la noche y retomada al
+// otro día no suma las horas de por medio.
+
+// Una sesión más larga que esto es casi seguro el reloj y no el
+// entrenamiento: la app quedó abierta, o el teléfono se cerró sin pausar y
+// la sesión siguió viva. En ese caso es más honesto no reportar nada y caer
+// en la estimación vieja que mandar un número inventado.
+export const MAX_MINUTOS_SESION = 240;
+
+export function iniciarReloj(ahora = Date.now()) {
+  return { inicio: ahora, acumulado: 0 };
+}
+
+export function pausarReloj(tiempo, ahora = Date.now()) {
+  if (!tiempo?.inicio) return tiempo ?? null; // ya estaba en pausa
+  return { inicio: null, acumulado: (tiempo.acumulado ?? 0) + Math.max(0, ahora - tiempo.inicio) };
+}
+
+export function reanudarReloj(tiempo, ahora = Date.now()) {
+  if (tiempo?.inicio) return tiempo; // ya estaba corriendo
+  return { inicio: ahora, acumulado: tiempo?.acumulado ?? 0 };
+}
+
+/**
+ * Minutos activos de la sesión, o null si no hay un número confiable.
+ *
+ * Devuelve null —y no 0— cuando no se puede medir, para que quien lo use
+ * distinga "no lo sé" de "duró cero" y pueda caer en la estimación.
+ */
+export function minutosDeSesion(tiempo, ahora = Date.now()) {
+  if (!tiempo) return null;
+  const corriendo = tiempo.inicio ? Math.max(0, ahora - tiempo.inicio) : 0;
+  const minutos = Math.round(((tiempo.acumulado ?? 0) + corriendo) / 60000);
+  if (minutos <= 0 || minutos > MAX_MINUTOS_SESION) return null;
+  return minutos;
+}

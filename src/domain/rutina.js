@@ -406,3 +406,29 @@ export const RUTINA_INICIAL = [
     ],
   },
 ];
+
+// Minutos medidos de una sesión, guardados en el día que se entrenó. Van
+// acá y no en un store aparte porque `construirSesiones` arma el payload de
+// HM a partir de `dias` y nada más — y porque ya viven acá `ultimaSesion` y
+// `sesionesFechas`, que son el mismo tipo de dato: qué pasó con este día en
+// tal fecha.
+export function registrarDuracion(dias, diaId, fecha, minutos) {
+  if (!minutos) return dias;
+  return dias.map((d) =>
+    d.id === diaId ? { ...d, duraciones: { ...(d.duraciones ?? {}), [fecha]: minutos } } : d
+  );
+}
+
+/**
+ * Minutos medidos para una fecha, o null si esa sesión es anterior a que se
+ * midiera el tiempo.
+ *
+ * Suma entre días en vez de tomar el máximo: una sesión pertenece a un solo
+ * día, así que dos registros en la misma fecha son dos entrenamientos
+ * distintos (p.ej. Día A a la mañana y Día C a la tarde), no el mismo
+ * contado dos veces.
+ */
+export function duracionRegistrada(dias, fecha) {
+  const total = (dias ?? []).reduce((sum, d) => sum + (d.duraciones?.[fecha] ?? 0), 0);
+  return total > 0 ? total : null;
+}

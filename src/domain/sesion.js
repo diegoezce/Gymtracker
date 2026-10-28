@@ -159,3 +159,28 @@ export function minutosDeSesion(tiempo, ahora = Date.now()) {
   if (minutos <= 0 || minutos > MAX_MINUTOS_SESION) return null;
   return minutos;
 }
+
+/**
+ * Segundos corridos de un reloj, para mostrarlo en pantalla mientras avanza.
+ *
+ * `minutosDeSesion` redondea, topea y devuelve null cuando no confía en el
+ * número: eso sirve para reportar, no para un cronómetro a la vista.
+ */
+export function segundosDeReloj(tiempo, ahora = Date.now()) {
+  if (!tiempo) return 0;
+  const corriendo = tiempo.inicio ? Math.max(0, ahora - tiempo.inicio) : 0;
+  return Math.floor(((tiempo.acumulado ?? 0) + corriendo) / 1000);
+}
+
+/**
+ * Minutos a registrar para un cardio cronometrado.
+ *
+ * Redondea al minuto pero nunca a cero: haber arrancado el cronómetro y que
+ * quede "0 min" sería peor que no haberlo medido. Debajo de 30 segundos
+ * devuelve null — ahí es un toque sin querer, no un cardio.
+ */
+export function minutosDeCardio(tiempo, ahora = Date.now()) {
+  const seg = segundosDeReloj(tiempo, ahora);
+  if (seg < 30) return null;
+  return Math.max(1, Math.round(seg / 60));
+}

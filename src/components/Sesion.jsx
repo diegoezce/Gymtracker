@@ -4,7 +4,7 @@ import { barra } from "../styles/helpers";
 import { fmt, hoy } from "../utils/format";
 import { describirBase, sugerirPeso } from "../domain/progression";
 import { tieneImagen } from "../domain/imagen";
-import { editarSerie as editarSerieEnSesion } from "../domain/sesion";
+import { editarSerie as editarSerieEnSesion, iniciarReloj, pausarReloj, reanudarReloj, segundosDeReloj, minutosDeCardio } from "../domain/sesion";
 import { Marco } from "./Marco";
 import { Cabecera } from "./Cabecera";
 import { Etiqueta } from "./Etiqueta";
@@ -101,11 +101,36 @@ function NumStep({ value, onChange, step = 1, min = 0 }) {
   );
 }
 
-function SesionCardio({ ej, guardarCardio, salir }) {
+function SesionCardio({ ej, guardarCardio, salir, sesion, setSesion }) {
   const ultima = [...ej.historial].reverse().find((h) => h.fecha !== hoy());
   const [duracion, setDuracion] = useState(ultima?.duracion ?? ej.duracionMin);
   const [distancia, setDistancia] = useState(ultima?.distancia ?? ej.distanciaKm ?? 0);
   const trackDist = ej.distanciaKm !== null;
+
+  // El cronómetro vive en `sesion` y no en estado local: así sobrevive a
+  // salir al menú del día, a bloquear el teléfono y a que se recargue la
+  // app — que es justo lo que pasa durante 20 minutos de bici.
+  const reloj = sesion?.cardio?.ejId === ej.id ? sesion.cardio.tiempo : null;
+  const corriendo = Boolean(reloj?.inicio);
+  const [seg, setSeg] = useState(() => segundosDeReloj(reloj));
+
+  useEffect(() => {
+    setSeg(segundosDeReloj(reloj));
+    if (!corriendo) return undefined;
+    // Cuenta contra el timestamp real, no sumando ticks: si el teléfono
+    // suspende el timer, al volver muestra el tiempo verdadero.
+    const id = setInterval(() => setSeg(segundosDeReloj(reloj)), 500);
+    return () => clearInterval(id);
+  }, [reloj, corriendo]);
+
+  const guardarReloj = (tiempo) => setSesion({ ...sesion, cardio: { ejId: ej.id, tiempo } });
+  const arrancar = () => guardarReloj(reloj ? reanudarReloj(reloj) : iniciarReloj());
+  const detener = () => {
+    const parado = pausarReloj(reloj);
+    guardarReloj(parado);
+    const medidos = minutosDeCardio(parado);
+    if (medidos) setDuracion(medidos);
+  };
 
   return (
     <div style={{ padding: "8px 20px 32px" }}>
@@ -114,10 +139,38 @@ function SesionCardio({ ej, guardarCardio, salir }) {
       </h1>
       <Etiqueta>Cardio · objetivo {ej.duracionMin} min{trackDist ? ` · ${ej.distanciaKm} km` : ""}</Etiqueta>
 
-      <div style={{ marginTop: 28 }}>
+      <div style={{ marginTop: 24 }}>
+        <Etiqueta>{corriendo ? "Cronómetro en marcha" : seg > 0 ? "Cronometrado" : "Cronómetro"}</Etiqueta>
+        <div
+          style={{
+            marginTop: 8,
+            background: C.sup,
+            border: `1px solid ${corriendo ? C.sodio : C.linea}`,
+            borderRadius: 4,
+            padding: "14px 0 16px",
+            textAlign: "center",
+          }}
+        >
+          <div style={{ fontFamily: MONO, fontSize: 40, fontWeight: 700, color: corriendo ? C.sodio : C.hueso }}>
+            {String(Math.floor(seg / 60)).padStart(2, "0")}:{String(seg % 60).padStart(2, "0")}
+          </div>
+          <div style={{ padding: "10px 14px 0" }}>
+            <Boton tono={corriendo ? "fantasma" : "fuerte"} alto={46} onClick={corriendo ? detener : arrancar}>
+              {corriendo ? "Terminar cardio" : seg > 0 ? "Seguir" : "Empezar cardio"}
+            </Boton>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ marginTop: 20 }}>
         <Etiqueta>Duración (min)</Etiqueta>
         <div style={{ marginTop: 8 }}>
           <NumStep value={duracion} onChange={setDuracion} step={5} min={1} />
+        </div>
+        <div style={{ fontFamily: SANS, fontSize: 12, color: C.gris, marginTop: 6 }}>
+          {seg > 0
+            ? "Lo cronometrado ya quedó acá. Podés corregirlo igual."
+            : "Se registra este número. Cronometrá arriba si querés el real."}
         </div>
       </div>
 
@@ -269,7 +322,7 @@ export function Sesion({ dia, ej, sesion, setSesion, guardarSerie, guardarSerieT
       <Cabecera izq={`${dia.nombre} · ${sesion.ejIdx + 1}/${dia.ejercicios.length}`} onSalir={() => salir(timerFin)} />
       {modalTecnica && <ModalTecnica ej={ej} onCerrar={() => setModalTecnica(false)} />}
       {ej.tipo === "cardio" ? (
-        <SesionCardio ej={ej} guardarCardio={guardarCardio} salir={salir} />
+        <SesionCardio ej={ej} guardarCardio={guardarCardio} salir={salir} sesion={sesion} setSesion={setSesion} />
       ) : (
         <div style={{ padding: "8px 20px 32px" }}>
           <div style={{ display: "flex", alignItems: "flex-start", gap: 10, margin: "16px 0 4px" }}>

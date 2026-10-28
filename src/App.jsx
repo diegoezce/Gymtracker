@@ -186,6 +186,7 @@ export default function App() {
       series: [],
       hechos: { ...sesion.hechos, [ej.id]: true },
       cerrados: { ...sesion.cerrados, [ej.id]: instantaneaCierre(ej) },
+      cardio: null, // el cronómetro ya cumplió: sus minutos están en la entrada
     });
   };
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { olvidarProgreso, entradasAVolcar, editarSerie, instantaneaCierre, reabrirEjercicio, iniciarReloj, pausarReloj, reanudarReloj, minutosDeSesion, MAX_MINUTOS_SESION } from "./sesion";
+import { olvidarProgreso, entradasAVolcar, editarSerie, instantaneaCierre, reabrirEjercicio, iniciarReloj, pausarReloj, reanudarReloj, minutosDeSesion, MAX_MINUTOS_SESION, segundosDeReloj, minutosDeCardio } from "./sesion";
 import { agregarEntradaHistorial } from "./rutina";
 
 describe("olvidarProgreso", () => {
@@ -248,5 +248,37 @@ describe("reloj de la sesión", () => {
     expect(minutosDeSesion(null)).toBeNull();
     expect(minutosDeSesion(undefined)).toBeNull();
     expect(minutosDeSesion(iniciarReloj(T0), T0 + 5_000)).toBeNull();
+  });
+});
+
+describe("cronómetro de cardio", () => {
+  const T0 = 1_000_000_000_000;
+
+  it("muestra los segundos corridos", () => {
+    expect(segundosDeReloj(iniciarReloj(T0), T0 + 95_000)).toBe(95);
+  });
+
+  it("detenido, muestra lo acumulado", () => {
+    const parado = pausarReloj(iniciarReloj(T0), T0 + 95_000);
+    expect(segundosDeReloj(parado, T0 + 999_000)).toBe(95);
+  });
+
+  it("registra los minutos redondeados", () => {
+    expect(minutosDeCardio(iniciarReloj(T0), T0 + 14 * 60_000 + 40_000)).toBe(15);
+  });
+
+  it("nunca registra 0 si de verdad se midió algo", () => {
+    // 40 segundos redondea a 1, no a 0: haber cronometrado y que quede en
+    // cero es peor que no haber medido.
+    expect(minutosDeCardio(iniciarReloj(T0), T0 + 40_000)).toBe(1);
+  });
+
+  it("debajo de 30 segundos no es un cardio, es un toque sin querer", () => {
+    expect(minutosDeCardio(iniciarReloj(T0), T0 + 20_000)).toBeNull();
+  });
+
+  it("no rompe sin reloj", () => {
+    expect(segundosDeReloj(null)).toBe(0);
+    expect(minutosDeCardio(null)).toBeNull();
   });
 });

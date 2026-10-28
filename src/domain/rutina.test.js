@@ -21,6 +21,7 @@ import {
   ejerciciosFusionables,
   fusionarEjercicios,
   fusionarDias,
+  convertirATiempo,
 } from "./rutina";
 
 function dosDias() {
@@ -745,5 +746,84 @@ describe("fusionarDias", () => {
   it("no-op si algún id no existe", () => {
     const { dias } = dosDiasConEjercicios();
     expect(fusionarDias(dias, "a", "no-existe")).toBe(dias);
+  });
+});
+
+describe("convertirATiempo", () => {
+  const plancha = (extra = {}) => ({
+    id: "plancha",
+    nombre: "Plancha frontal",
+    peso: 0,
+    incremento: 0,
+    series: 3,
+    repsMin: 30,
+    repsMax: 45,
+    repsObjetivo: 30,
+    descanso: 45,
+    ajustes: [],
+    historial: [
+      { fecha: "2026-10-16", series: [{ peso: 0, reps: 40, rir: 2 }, { peso: 0, reps: 40, rir: 2 }] },
+      { fecha: "2026-10-21", series: [{ peso: 0, reps: 50, rir: 1 }] },
+    ],
+    ...extra,
+  });
+  const conPlancha = (extra) => [{ id: "a", nombre: "Día A", ejercicios: [plancha(extra)] }];
+  const resultado = (dias) => dias[0].ejercicios[0];
+
+  it("las reps guardadas eran segundos: pasan tal cual", () => {
+    const ej = resultado(convertirATiempo(conPlancha(), "plancha"));
+    expect(ej.historial[0].series).toEqual([{ segundos: 40 }, { segundos: 40 }]);
+    expect(ej.historial[1].series).toEqual([{ segundos: 50 }]);
+  });
+
+  it("toma el techo del rango como duración objetivo", () => {
+    expect(resultado(convertirATiempo(conPlancha(), "plancha")).duracionObjetivo).toBe(45);
+  });
+
+  it("descarta lo que sólo tiene sentido con carga", () => {
+    const ej = resultado(convertirATiempo(conPlancha(), "plancha"));
+    expect(ej.tipo).toBe("tiempo");
+    expect(ej).not.toHaveProperty("peso");
+    expect(ej).not.toHaveProperty("repsMax");
+    expect(ej).not.toHaveProperty("ajustes");
+  });
+
+  it("no hereda el incremento en kilos, que acá significaría segundos", () => {
+    // El de la plancha era 0: heredarlo la dejaría sin progresar nunca.
+    expect(resultado(convertirATiempo(conPlancha(), "plancha")).incremento).toBe(5);
+  });
+
+  it("conserva lo propio del día", () => {
+    const ej = resultado(convertirATiempo(conPlancha(), "plancha"));
+    expect(ej).toMatchObject({ nombre: "Plancha frontal", series: 3, descanso: 45 });
+  });
+
+  it("convierte todas las copias del ejercicio, en todos los días", () => {
+    const dias = [
+      { id: "a", nombre: "Día A", ejercicios: [plancha()] },
+      { id: "b", nombre: "Día B", ejercicios: [plancha({ series: 2 })] },
+    ];
+    const convertidos = convertirATiempo(dias, "plancha");
+    expect(convertidos.map((d) => d.ejercicios[0].tipo)).toEqual(["tiempo", "tiempo"]);
+    expect(convertidos[1].ejercicios[0].series).toBe(2); // lo del día no se toca
+  });
+
+  it("no toca a los demás ejercicios", () => {
+    const dias = [
+      { id: "a", nombre: "Día A", ejercicios: [plancha(), { id: "otro", nombre: "Prensa", peso: 80, historial: [] }] },
+    ];
+    expect(convertirATiempo(dias, "plancha")[0].ejercicios[1]).toMatchObject({ peso: 80 });
+  });
+
+  it("es idempotente y no toca cardio", () => {
+    const unaVez = convertirATiempo(conPlancha(), "plancha");
+    expect(convertirATiempo(unaVez, "plancha")).toBe(unaVez);
+    const cardio = [{ id: "a", nombre: "Día A", ejercicios: [{ id: "c", tipo: "cardio", nombre: "Cardio", historial: [] }] }];
+    expect(convertirATiempo(cardio, "c")).toBe(cardio);
+  });
+
+  it("no rompe con un id que no existe", () => {
+    const dias = conPlancha();
+    expect(convertirATiempo(dias, "fantasma")).toBe(dias);
   });
 });

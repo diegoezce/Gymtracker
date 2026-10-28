@@ -166,7 +166,10 @@ export function aplicarSesiones(dias, sesiones) {
                 duracion: preferir(ejHC.duracion, local?.duracion),
                 distancia: preferir(ejHC.distancia, local?.distancia),
               }
-            : { fecha: s.fecha, series: preferir(ejHC.series, local?.series) },
+            : {
+                fecha: s.fecha,
+                series: seriesPara(ej, preferir(ejHC.series, local?.series)),
+              },
         ];
       });
 
@@ -238,6 +241,17 @@ export function aplicarRutina(rutinaHC, diasLocales) {
 // peso/asiento) para calcular una duración total aproximada — no medimos
 // tiempo real de sesión, así que esto es sólo una aproximación razonable.
 const SEGUNDOS_ACTIVOS_POR_SERIE = 45;
+
+// Un ejercicio que se pasó a "por tiempo" (ver convertirATiempo) tiene en
+// HC sus sesiones viejas con la forma de fuerza: {peso, reps, rir}, donde
+// ese `reps` siempre fue la cantidad de segundos. Traerlas tal cual dejaría
+// series sin `segundos` dentro de un ejercicio que sólo lee ese campo, y la
+// duración objetivo se iría a NaN. La traducción es la misma que hizo la
+// conversión: el número ya era el correcto.
+function seriesPara(ej, series) {
+  if (ej.tipo !== "tiempo" || !series) return series;
+  return series.map((s) => (s.segundos != null ? s : { segundos: s.reps ?? 0 }));
+}
 
 // A qué día(s) confirmó explícitamente cada fecha `marcarSesionDia`. HC
 // guarda una sola sesión por fecha (ver construirSesiones), así que esto

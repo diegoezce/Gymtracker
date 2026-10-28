@@ -510,3 +510,54 @@ describe("aplicarSesiones — un campo que HC no trae no borra el local", () => 
     expect(dias[0].ejercicios[0].historial[0].series).toHaveLength(1);
   });
 });
+
+describe("aplicarSesiones — ejercicio pasado a por tiempo", () => {
+  const diaConPlancha = (historial = []) => [
+    {
+      id: "a",
+      nombre: "Día A",
+      ejercicios: [
+        { id: "p", tipo: "tiempo", nombre: "Plancha frontal", duracionObjetivo: 45, historial },
+      ],
+    },
+  ];
+  // Lo que HC tiene guardado de antes de la conversión: forma de fuerza.
+  const sesionVieja = [
+    {
+      fecha: "2026-10-21",
+      dia: "Día A",
+      ejercicios: [{ nombre: "Plancha frontal", series: [{ peso: 0, reps: 40, rir: 2 }] }],
+    },
+  ];
+  const seriesDe = (dias) => dias[0].ejercicios[0].historial[0].series;
+
+  it("traduce las reps viejas a segundos: ese número siempre fue segundos", () => {
+    expect(seriesDe(aplicarSesiones(diaConPlancha(), sesionVieja))).toEqual([{ segundos: 40 }]);
+  });
+
+  it("no toca las series que ya vienen en segundos", () => {
+    const sesion = [
+      {
+        fecha: "2026-10-21",
+        dia: "Día A",
+        ejercicios: [{ nombre: "Plancha frontal", series: [{ segundos: 50 }] }],
+      },
+    ];
+    expect(seriesDe(aplicarSesiones(diaConPlancha(), sesion))).toEqual([{ segundos: 50 }]);
+  });
+
+  it("deja la duración objetivo en un número, no en NaN", () => {
+    // Sin la traducción, Math.max(...[undefined]) daba NaN y rompía la
+    // progresión del ejercicio.
+    const dias = aplicarSesiones(diaConPlancha(), sesionVieja);
+    expect(dias[0].ejercicios[0].duracionObjetivo).toBe(40);
+  });
+
+  it("a un ejercicio de fuerza no le toca las series", () => {
+    const dias = aplicarSesiones(
+      [{ id: "a", nombre: "Día A", ejercicios: [{ id: "x", nombre: "Prensa", historial: [] }] }],
+      [{ fecha: "2026-10-21", dia: "Día A", ejercicios: [{ nombre: "Prensa", series: [{ peso: 80, reps: 10, rir: 1 }] }] }]
+    );
+    expect(dias[0].ejercicios[0].historial[0].series).toEqual([{ peso: 80, reps: 10, rir: 1 }]);
+  });
+});

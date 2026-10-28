@@ -11,6 +11,7 @@ import {
   diaPierdeHistorial,
   moverEjercicioOrden,
   fusionarDias,
+  convertirATiempo,
   eliminarEjercicioDeTodos,
 } from "../domain/rutina";
 import { achicar, faltaSubir, tieneImagen } from "../domain/imagen";
@@ -587,7 +588,7 @@ function TarjetaTiempo({ ej, diaId, dias, idx, total, onEditar, onQuitar, onMove
   );
 }
 
-function TarjetaFuerza({ ej, diaId, dias, idx, total, onEditar, onQuitar, onMover, onMoverOrden }) {
+function TarjetaFuerza({ ej, diaId, dias, idx, total, onEditar, onQuitar, onMover, onMoverOrden, onConvertirTiempo }) {
   const [abierto, setAbierto] = useState(false);
   const e = (campo, valor) => onEditar(diaId, ej.id, campo, valor);
 
@@ -637,7 +638,13 @@ function TarjetaFuerza({ ej, diaId, dias, idx, total, onEditar, onQuitar, onMove
             </div>
           </div>
 
-          <CamposTecnica ej={ej} onEditar={e} />
+          <CamposTecnica ej={ej} onEditar={e} />          <CamposTecnica ej={ej} onEditar={e} />
+
+          {/* Planchas e isométricos se cargan a veces como ejercicios de
+              fuerza, y entonces los segundos se muestran como repeticiones.
+              La conversión es exacta: ese número ya era segundos. */}
+          <ConvertirATiempo ej={ej} onConfirmar={() => onConvertirTiempo(ej.id)} />
+
 
           {dias.length > 1 && (
             <div>
@@ -663,6 +670,37 @@ function TarjetaFuerza({ ej, diaId, dias, idx, total, onEditar, onQuitar, onMove
   );
 }
 
+function ConvertirATiempo({ ej, onConfirmar }) {
+  const [confirmando, setConfirmando] = useState(false);
+  const sesiones = ej.historial?.length ?? 0;
+
+  if (!confirmando) {
+    return (
+      <button
+        onClick={() => setConfirmando(true)}
+        style={{ background: "none", border: "none", color: C.gris, fontFamily: SANS, fontSize: 12, padding: 0, textAlign: "left", cursor: "pointer", textDecoration: "underline" }}
+      >
+        Es un ejercicio por tiempo, no por repeticiones
+      </button>
+    );
+  }
+
+  return (
+    <div style={{ background: C.sup, border: `1px solid ${C.sodio}`, borderRadius: 6, padding: "12px 14px" }}>
+      <div style={{ fontFamily: SANS, fontSize: 13, color: C.hueso, lineHeight: 1.5 }}>
+        Pasa <b>{ej.nombre}</b> a ejercicio por tiempo: vas a registrar segundos en vez de
+        repeticiones, y la progresión sube la duración en lugar del peso.
+        {sesiones > 0 && ` Las ${sesiones} sesiones guardadas se convierten (${ej.repsMax ?? ej.repsMin} reps pasan a ser ${ej.repsMax ?? ej.repsMin} segundos).`}
+        {" "}Se descartan el peso y el rango de reps, que dejan de aplicar.
+      </div>
+      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+        <Boton tono="fuerte" alto={44} onClick={onConfirmar}>Convertir</Boton>
+        <Boton tono="fantasma" alto={44} onClick={() => setConfirmando(false)}>Cancelar</Boton>
+      </div>
+    </div>
+  );
+}
+
 function TarjetaEjercicio(props) {
   if (props.ej.tipo === "cardio") return <TarjetaCardio {...props} />;
   if (props.ej.tipo === "tiempo") return <TarjetaTiempo {...props} />;
@@ -676,7 +714,7 @@ function TarjetaEjercicio(props) {
 // copia por día se edita con las mismas tarjetas que ya usa la lista de
 // días de abajo, y se agrega una acción para borrarlo de todos los días
 // a la vez (hoy sólo existe "quitar de este día" por día).
-function PanelEjercicios({ dias, editar, quitarEjercicio, moverEjercicio, moverOrden, onEliminar, onCrear }) {
+function PanelEjercicios({ dias, editar, quitarEjercicio, moverEjercicio, moverOrden, convertirTiempo, onEliminar, onCrear }) {
   const [expandido, setExpandido] = useState(null);
   const [confirmandoEliminar, setConfirmandoEliminar] = useState(null);
 
@@ -752,6 +790,7 @@ function PanelEjercicios({ dias, editar, quitarEjercicio, moverEjercicio, moverO
                             idx={0}
                             total={1}
                             onEditar={editar}
+                            onConvertirTiempo={convertirTiempo}
                             onQuitar={quitarEjercicio}
                             onMover={moverEjercicio}
                             onMoverOrden={moverOrden}
@@ -1520,6 +1559,8 @@ export function Ajustes({ dias, setDias, agregarEjercicioADia, traerHistorialDeH
     }
   };
 
+  const convertirEjercicioATiempo = (ejId) => setDias(convertirATiempo(dias, ejId));
+
   const quitarEjercicio = (diaId, ejId) =>
     setDias(dias.map((d) =>
       d.id !== diaId ? d : { ...d, ejercicios: d.ejercicios.filter((e) => e.id !== ejId) }
@@ -1691,6 +1732,7 @@ export function Ajustes({ dias, setDias, agregarEjercicioADia, traerHistorialDeH
                     idx={idx}
                     total={d.ejercicios.length}
                     onEditar={editar}
+                            onConvertirTiempo={convertirEjercicioATiempo}
                     onQuitar={quitarEjercicio}
                     onMover={moverEjercicio}
                     onMoverOrden={moverOrden}
@@ -1731,6 +1773,7 @@ export function Ajustes({ dias, setDias, agregarEjercicioADia, traerHistorialDeH
           quitarEjercicio={quitarEjercicio}
           moverEjercicio={moverEjercicio}
           moverOrden={moverOrden}
+          convertirTiempo={convertirEjercicioATiempo}
           onEliminar={eliminarEjercicioCompleto}
           onCrear={() => setCreandoEjercicio(true)}
         />

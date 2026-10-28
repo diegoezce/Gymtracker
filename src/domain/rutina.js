@@ -432,3 +432,45 @@ export function duracionRegistrada(dias, fecha) {
   const total = (dias ?? []).reduce((sum, d) => sum + (d.duraciones?.[fecha] ?? 0), 0);
   return total > 0 ? total : null;
 }
+
+/**
+ * Pasa a "por tiempo" un ejercicio que quedó cargado como de fuerza pero en
+ * realidad se hace por segundos — planchas, isométricos.
+ *
+ * La conversión del historial es exacta y no inventa nada: el número
+ * guardado en `reps` ya ERA la cantidad de segundos, sólo que etiquetada
+ * como repeticiones. Una plancha de "40 reps" pasa a ser una de 40s.
+ *
+ * Se descartan los campos que sólo tienen sentido con carga (peso, rango de
+ * reps, ajustes) en vez de dejarlos como basura: un ejercicio por tiempo
+ * progresa subiendo segundos, no kilos.
+ */
+export function convertirATiempo(dias, ejId) {
+  const ej = dias.flatMap((d) => d.ejercicios).find((e) => e.id === ejId);
+  if (!ej || ej.tipo === "tiempo" || ej.tipo === "cardio") return dias;
+
+  const duracionObjetivo = ej.repsMax ?? ej.repsMin ?? ej.repsObjetivo ?? 30;
+  const historial = (ej.historial ?? []).map((h) => ({
+    fecha: h.fecha,
+    series: (h.series ?? []).map((s) => ({ segundos: s.segundos ?? s.reps ?? 0 })),
+  }));
+
+  return dias.map((d) => ({
+    ...d,
+    ejercicios: d.ejercicios.map((e) => {
+      if (e.id !== ejId) return e;
+      const { peso: _peso, repsMin: _min, repsMax: _max, repsObjetivo: _obj, ajustes: _aj, ...resto } = e;
+      return {
+        ...resto,
+        tipo: "tiempo",
+        duracionObjetivo,
+        // El incremento de fuerza está en kilos y acá pasaría a significar
+        // segundos. Mejor arrancar del default de ejercicioTiempo que
+        // heredar un número que quería decir otra cosa — y un 0 heredado
+        // dejaría al ejercicio sin progresar nunca.
+        incremento: 5,
+        historial,
+      };
+    }),
+  }));
+}

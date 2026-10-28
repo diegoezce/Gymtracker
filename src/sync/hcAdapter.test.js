@@ -449,3 +449,64 @@ describe("construirSesiones — duración", () => {
     expect(sesion.duracion_min).toBe(77);
   });
 });
+
+describe("aplicarSesiones — un campo que HC no trae no borra el local", () => {
+  const diaConCardio = (entrada) => [
+    {
+      id: "a",
+      nombre: "Día A",
+      ejercicios: [{ id: "c", tipo: "cardio", nombre: "Cardio", historial: [entrada] }],
+    },
+  ];
+  const sesionHC = (ejercicio) => [
+    { fecha: "2026-10-23", dia: "Día A", ejercicios: [ejercicio] },
+  ];
+  const cardioDe = (dias) => dias[0].ejercicios[0].historial[0];
+
+  it("conserva los minutos de cardio cuando HC no los tiene", () => {
+    // El caso real: HM guarda el cardio como {nombre, series: []}, sin
+    // duracion. Antes eso pisaba los minutos locales con undefined y, como
+    // HM nunca los tuvo, no volvían nunca.
+    const dias = aplicarSesiones(
+      diaConCardio({ fecha: "2026-10-23", duracion: 20, distancia: 3.5 }),
+      sesionHC({ nombre: "Cardio", series: [] })
+    );
+    expect(cardioDe(dias)).toMatchObject({ duracion: 20, distancia: 3.5 });
+  });
+
+  it("pero deja que HC corrija los minutos cuando sí los tiene", () => {
+    const dias = aplicarSesiones(
+      diaConCardio({ fecha: "2026-10-23", duracion: 20 }),
+      sesionHC({ nombre: "Cardio", series: [], duracion: 35 })
+    );
+    expect(cardioDe(dias).duracion).toBe(35);
+  });
+
+  it("respeta un null explícito de HC: es un dato, no una ausencia", () => {
+    const dias = aplicarSesiones(
+      diaConCardio({ fecha: "2026-10-23", duracion: 20, distancia: 3.5 }),
+      sesionHC({ nombre: "Cardio", series: [], duracion: 20, distancia: null })
+    );
+    expect(cardioDe(dias).distancia).toBeNull();
+  });
+
+  it("lo mismo para las series de un ejercicio de fuerza", () => {
+    const dias = aplicarSesiones(
+      [
+        {
+          id: "a",
+          nombre: "Día A",
+          ejercicios: [
+            {
+              id: "x",
+              nombre: "Prensa",
+              historial: [{ fecha: "2026-10-23", series: [{ peso: 80, reps: 10, rir: 1 }] }],
+            },
+          ],
+        },
+      ],
+      sesionHC({ nombre: "Prensa" }) // sin series
+    );
+    expect(dias[0].ejercicios[0].historial[0].series).toHaveLength(1);
+  });
+});

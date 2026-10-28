@@ -153,10 +153,20 @@ export function aplicarSesiones(dias, sesiones) {
       const desdeHC = sesionesDelDia.flatMap((s) => {
         const ejHC = s.ejercicios.find((e) => mismoNombre(e.nombre, ej.nombre));
         if (!ejHC) return [];
+        // HC gana, pero sólo donde HC tiene dato: un campo que no trae no
+        // puede borrar el local. Así es como las entradas de cardio
+        // perdían sus minutos —HC nunca los tuvo, así que cada "traer
+        // historial" los pisaba con undefined— y no volvían nunca más.
+        const local = (ej.historial ?? []).find((h) => h.fecha === s.fecha);
+        const preferir = (deHC, deLocal) => (deHC === undefined ? deLocal : deHC);
         return [
           ej.tipo === "cardio"
-            ? { fecha: s.fecha, duracion: ejHC.duracion, distancia: ejHC.distancia }
-            : { fecha: s.fecha, series: ejHC.series },
+            ? {
+                fecha: s.fecha,
+                duracion: preferir(ejHC.duracion, local?.duracion),
+                distancia: preferir(ejHC.distancia, local?.distancia),
+              }
+            : { fecha: s.fecha, series: preferir(ejHC.series, local?.series) },
         ];
       });
 

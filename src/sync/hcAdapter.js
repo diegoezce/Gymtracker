@@ -1,4 +1,4 @@
-import { diasDondeAparece } from "../domain/rutina";
+import { diasDondeAparece, duracionRegistrada } from "../domain/rutina";
 import { mismoNombre } from "../domain/nombre";
 
 const HC_URL = "https://hm.sparkio.me";
@@ -314,9 +314,12 @@ export function construirSesiones(dias) {
         .filter(({ e }) => e.tipo === "cardio")
         .reduce((sum, { entrada }) => sum + (entrada.duracion ?? 0), 0);
 
-      // Fuerza/tiempo no miden duración real: se estima con el tiempo activo
-      // por serie (o los segundos sostenidos, para tipo "tiempo") más el
-      // descanso entre series (no después de la última).
+      // Estimación de respaldo, para las sesiones anteriores a que la app
+      // midiera el tiempo: tiempo activo por serie (o los segundos
+      // sostenidos, para tipo "tiempo") más el descanso entre series, sin
+      // contar el posterior a la última. Subestima el tiempo real de
+      // gimnasio — no cuenta el rato entre ejercicios — y usa el descanso
+      // configurado aunque lo hayas salteado.
       const segundosEstimados = entradas
         .filter(({ e }) => e.tipo !== "cardio")
         .reduce((sum, { e, entrada }) => {
@@ -330,7 +333,11 @@ export function construirSesiones(dias) {
           return sum + activo + descansos;
         }, 0);
 
-      const duracion_min = Math.round(minutosCardio + segundosEstimados / 60) || null;
+      // Lo medido manda. La fórmula queda sólo para las fechas que no lo
+      // tienen: no hay forma de reconstruir hacia atrás cuánto duró una
+      // sesión de septiembre.
+      const estimados = Math.round(minutosCardio + segundosEstimados / 60) || null;
+      const duracion_min = duracionRegistrada(dias, fecha) ?? estimados;
       const dia = nombreDiaPara(dias, fecha, confirmadas.get(fecha));
       return { fecha, dia, ejercicios, volumen_kg, duracion_min };
     })

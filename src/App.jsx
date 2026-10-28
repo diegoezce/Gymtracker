@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { storage, CLAVE_RUTINA, CLAVE_SESION } from "./storage";
-import { RUTINA_INICIAL, actualizarCompartido, vincularEjercicio, resincronizarCompartidos, agregarEntradaHistorial, editarEntradaHistorial, eliminarEntradaHistorial, fusionarEjercicios, marcarSesionDia } from "./domain/rutina";
+import { RUTINA_INICIAL, actualizarCompartido, vincularEjercicio, resincronizarCompartidos, agregarEntradaHistorial, editarEntradaHistorial, eliminarEntradaHistorial, fusionarEjercicios, marcarSesionDia, registrarDuracion } from "./domain/rutina";
 import { leerToken, leerAutoSync, fetchSesiones, aplicarSesiones, pushSesiones, construirSesiones, fetchRutina, aplicarRutina, SYNC_KEY, TOKEN_KEY } from "./sync/hcAdapter";
 import { progresar, aprender } from "./domain/progression";
-import { olvidarProgreso, entradasAVolcar, instantaneaCierre, reabrirEjercicio as deshacerCierre } from "./domain/sesion";
+import { olvidarProgreso, entradasAVolcar, instantaneaCierre, reabrirEjercicio as deshacerCierre, iniciarReloj, pausarReloj, reanudarReloj, minutosDeSesion } from "./domain/sesion";
 import { resumenSesion } from "./domain/resumen";
 import { hoy } from "./utils/format";
 import { Marco } from "./components/Marco";
@@ -62,7 +62,14 @@ export default function App() {
       } catch (e) {}
       try {
         const s = await storage.get(CLAVE_SESION);
-        if (s?.value) setSesion(JSON.parse(s.value));
+        if (s?.value) {
+          const guardada = JSON.parse(s.value);
+          // `sesionPausada` no se persiste: al reabrir la app siempre se
+          // vuelve a la sesión activa. Si el reloj había quedado en pausa
+          // hay que reanudarlo, o todo el tiempo de acá en más no se
+          // contaría. Lo acumulado se conserva; la pausa no se cuenta.
+          setSesion({ ...guardada, tiempo: guardada.tiempo ? reanudarReloj(guardada.tiempo) : guardada.tiempo });
+        }
       } catch (e) {}
       setCargando(false);
     })();
@@ -120,13 +127,21 @@ export default function App() {
   const comenzar = (dia) => {
     setAviso("");
     setSesionPausada(false);
-    setSesion({ diaId: dia.id, ejIdx: null, pesoActual: 0, series: [], hechos: {}, progreso: {}, saltados: {}, extra: {}, cerrados: {} });
+    setSesion({ diaId: dia.id, ejIdx: null, pesoActual: 0, series: [], hechos: {}, progreso: {}, saltados: {}, extra: {}, cerrados: {}, tiempo: iniciarReloj() });
   };
 
   // Pausar: vuelve a Inicio sin tocar la sesión — queda intacta (en memoria
   // y persistida) para retomarla. No escribe nada en `dias`/historial.
-  const pausarSesion = () => setSesionPausada(true);
-  const reanudarSesion = () => setSesionPausada(false);
+  // El reloj acompaña a la pausa: una sesión pausada a la noche y retomada
+  // al otro día no tiene que sumar las horas de por medio.
+  const pausarSesion = () => {
+    setSesion((prev) => (prev ? { ...prev, tiempo: pausarReloj(prev.tiempo) } : prev));
+    setSesionPausada(true);
+  };
+  const reanudarSesion = () => {
+    setSesion((prev) => (prev ? { ...prev, tiempo: reanudarReloj(prev.tiempo) } : prev));
+    setSesionPausada(false);
+  };
 
   // Empezar un día distinto al que está en pausa descarta lo no guardado de
   // ese otro (nunca llegó a `dias`, sólo vivía en `sesion.progreso`).
@@ -296,6 +311,18 @@ export default function App() {
 
     // ejercicios cerrados del todo durante la sesión (no sólo el parcial de arriba)
     const huboActividad = Object.keys(sesion.hechos).length > 0 || entradas.length > 0;
+
+    // Los minutos reales se registran acá, antes de cualquier branch: tanto
+    // el sync silencioso como el que se confirma a mano arman el payload a
+    // partir de `nuevos`, y la duración tiene que viajar en los dos.
+    if (huboActividad) {
+      const minutos = minutosDeSesion(sesion.tiempo);
+      if (minutos) {
+        nuevos = registrarDuracion(nuevos, dia.id, hoy(), minutos);
+        setDias(nuevos);
+      }
+    }
+
     const token = leerToken();
     if (huboActividad && token && !leerAutoSync()) {
       setPreguntaSync(nuevos);

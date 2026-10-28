@@ -402,3 +402,50 @@ describe("aplicarSesiones — match de nombres tolerante", () => {
     expect(historialDe(dias)).toHaveLength(0);
   });
 });
+
+describe("construirSesiones — duración", () => {
+  const diaCon = (extra = {}) => [
+    {
+      id: "a",
+      nombre: "Día A",
+      ...extra,
+      ejercicios: [
+        {
+          id: "x",
+          nombre: "Prensa",
+          descanso: 120,
+          historial: [
+            { fecha: "2026-10-28", series: [{ peso: 80, reps: 10, rir: 1 }, { peso: 80, reps: 10, rir: 1 }] },
+          ],
+        },
+      ],
+    },
+  ];
+
+  it("usa los minutos medidos cuando la sesión los tiene", () => {
+    const [sesion] = construirSesiones(diaCon({ duraciones: { "2026-10-28": 47 } }));
+    expect(sesion.duracion_min).toBe(47);
+  });
+
+  it("cae en la estimación para las fechas sin medición", () => {
+    // 2 series × 45 s + 1 descanso de 120 s = 210 s ≈ 4 min
+    const [sesion] = construirSesiones(diaCon());
+    expect(sesion.duracion_min).toBe(4);
+  });
+
+  it("no confunde la medición de otra fecha", () => {
+    const [sesion] = construirSesiones(diaCon({ duraciones: { "2026-10-21": 51 } }));
+    expect(sesion.duracion_min).toBe(4);
+  });
+
+  it("suma dos entrenamientos distintos de la misma fecha", () => {
+    // Día A a la mañana y Día C a la tarde son dos sesiones, no una
+    // contada dos veces: cada una la registra su propio día.
+    const dias = [
+      ...diaCon({ duraciones: { "2026-10-28": 47 } }),
+      { id: "c", nombre: "Día C", duraciones: { "2026-10-28": 30 }, ejercicios: [] },
+    ];
+    const [sesion] = construirSesiones(dias);
+    expect(sesion.duracion_min).toBe(77);
+  });
+});

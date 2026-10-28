@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { olvidarProgreso, entradasAVolcar, editarSerie, instantaneaCierre, reabrirEjercicio } from "./sesion";
+import { olvidarProgreso, entradasAVolcar, editarSerie, instantaneaCierre, reabrirEjercicio, iniciarReloj, pausarReloj, reanudarReloj, minutosDeSesion, MAX_MINUTOS_SESION } from "./sesion";
 import { agregarEntradaHistorial } from "./rutina";
 
 describe("olvidarProgreso", () => {
@@ -199,5 +199,54 @@ describe("instantaneaCierre", () => {
       duracionObjetivo: 40,
       incremento: 5,
     });
+  });
+});
+
+describe("reloj de la sesión", () => {
+  const T0 = 1_000_000_000_000;
+  const min = (n) => n * 60_000;
+
+  it("mide el tiempo corrido desde que arrancó", () => {
+    const reloj = iniciarReloj(T0);
+    expect(minutosDeSesion(reloj, T0 + min(47))).toBe(47);
+  });
+
+  it("al pausar deja de correr", () => {
+    const pausado = pausarReloj(iniciarReloj(T0), T0 + min(30));
+    // una hora después sigue marcando 30: el reloj está detenido
+    expect(minutosDeSesion(pausado, T0 + min(90))).toBe(30);
+  });
+
+  it("al retomar sigue sumando desde donde quedó, sin las horas de pausa", () => {
+    // 30 min de entrenamiento, pausa de 8 horas, 20 min más = 50, no 530.
+    let reloj = pausarReloj(iniciarReloj(T0), T0 + min(30));
+    reloj = reanudarReloj(reloj, T0 + min(510));
+    expect(minutosDeSesion(reloj, T0 + min(530))).toBe(50);
+  });
+
+  it("pausar dos veces seguidas no duplica lo acumulado", () => {
+    const una = pausarReloj(iniciarReloj(T0), T0 + min(30));
+    const dos = pausarReloj(una, T0 + min(90));
+    expect(minutosDeSesion(dos, T0 + min(90))).toBe(30);
+  });
+
+  it("retomar algo que ya estaba corriendo no reinicia el conteo", () => {
+    const reloj = reanudarReloj(iniciarReloj(T0), T0 + min(10));
+    expect(minutosDeSesion(reloj, T0 + min(40))).toBe(40);
+  });
+
+  it("no reporta nada si se pasa del tope: es el reloj, no el entrenamiento", () => {
+    // La app quedó abierta toda la noche sin pausar.
+    const reloj = iniciarReloj(T0);
+    expect(minutosDeSesion(reloj, T0 + min(MAX_MINUTOS_SESION + 1))).toBeNull();
+    expect(minutosDeSesion(reloj, T0 + min(MAX_MINUTOS_SESION))).toBe(MAX_MINUTOS_SESION);
+  });
+
+  it("devuelve null y no 0 cuando no hay nada medido", () => {
+    // null distingue "no lo sé" de "duró cero", que es lo que deja caer en
+    // la estimación vieja en vez de mandar un 0.
+    expect(minutosDeSesion(null)).toBeNull();
+    expect(minutosDeSesion(undefined)).toBeNull();
+    expect(minutosDeSesion(iniciarReloj(T0), T0 + 5_000)).toBeNull();
   });
 });

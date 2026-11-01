@@ -243,6 +243,51 @@ describe("aplicarSesiones reconstruye ultimaSesion y sesionesFechas", () => {
     expect(resultado.find((d) => d.id === "c").ultimaSesion).toBe("2026-10-26");
     expect(resultado.find((d) => d.id === "a").ultimaSesion).toBe("2026-10-28");
   });
+
+  it("infiere ultimaSesion desde ejercicios exclusivos cuando todas las sesiones tienen nombre compuesto", () => {
+    // Caso real del usuario: HC etiqueta todas las sesiones "Día A + Día B + Día C"
+    // y no hay ninguna con nombre exacto. La única forma de saber qué día
+    // fue cada sesión es mirar qué ejercicios exclusivos aparecen en ella.
+    const dias = [
+      {
+        id: "a",
+        nombre: "Día A",
+        ejercicios: [
+          { id: "solo-a", tipo: "fuerza", nombre: "Remo con apoyo", peso: 40, historial: [] },
+          { id: "prensa", tipo: "fuerza", nombre: "Prensa de piernas", peso: 80, historial: [] },
+        ],
+      },
+      {
+        id: "c",
+        nombre: "Día C",
+        ejercicios: [
+          { id: "solo-c", tipo: "fuerza", nombre: "Bicep dominada", peso: 30, historial: [] },
+          { id: "prensa", tipo: "fuerza", nombre: "Prensa de piernas", peso: 80, historial: [] },
+        ],
+      },
+    ];
+    const sesiones = [
+      {
+        fecha: "2026-10-26",
+        dia: "Día A + Día C",
+        ejercicios: [
+          { nombre: "Bicep dominada", series: [{ peso: 30, reps: 8, rir: 1 }] },
+          { nombre: "Prensa de piernas", series: [{ peso: 85, reps: 10, rir: 1 }] },
+        ],
+      },
+      {
+        fecha: "2026-10-28",
+        dia: "Día A + Día C",
+        ejercicios: [
+          { nombre: "Remo con apoyo", series: [{ peso: 40, reps: 8, rir: 1 }] },
+          { nombre: "Prensa de piernas", series: [{ peso: 90, reps: 10, rir: 1 }] },
+        ],
+      },
+    ];
+    const resultado = aplicarSesiones(dias, sesiones);
+    expect(resultado.find((d) => d.id === "c").ultimaSesion).toBe("2026-10-26");
+    expect(resultado.find((d) => d.id === "a").ultimaSesion).toBe("2026-10-28");
+  });
 });
 
 describe("construirSesiones con sesión mixta (fuerza + tiempo)", () => {

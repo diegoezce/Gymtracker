@@ -130,16 +130,106 @@ export async function fetchSesiones(token) {
 
 // Reconstruye el historial de cada ejercicio a partir de las sesiones del HC.
 // Actualiza también el peso al último registrado, y restaura ultimaSesion /
-// sesionesFechas a partir de sesiones con nombre exacto — ignorando nombres
-// compuestos ("Día A + Día B + Día C") que no identifican un día concreto.
+// sesionesFechas.
+//
+// Estrategia para determinar a qué día pertenece cada sesión:
+//   1. Sesiones con nombre exacto (s.dia === dia.nombre) — fuente confiable.
+//   2. Si no hay ninguna con nombre exacto (caso frecuente: historial antiguo
+//      donde todas las sesiones quedaron etiquetadas "Día A + Día B + Día C"),
+//      se infiere a partir de los ejercicios exclusivos de cada día: una
+//      sesión "pertenece" a un día si contiene algún ejercicio que sólo
+//      existe en ese día.
 export function aplicarSesiones(dias, sesiones) {
   return dias.map((dia) => {
-    // Sesiones que corresponden explícitamente a este día (nombre exacto).
-    // Las sesiones con nombre compuesto no cuentan para ultimaSesion porque
-    // no identifican en qué día de la rutina se entrenó.
+    // ── 1. Historiales de ejercicios ────────────────────────────────────────
+    // Para ejercicios NO compartidos: incluir sesiones con nombre exacto O
+    // con nombre compuesto que contenga este día. El check de nombre de
+    // ejercicio abajo garantiza que sólo se suman entradas donde el ejercicio
+    // realmente aparece — no hay contaminación cruzada.
+    const enEsteDia = (s) =>
+      s.dia === dia.nombre || s.dia.split(" + ").includes(dia.nombre);
+
+    const ejerciciosActualizados = dia.ejercicios.map((ej) => {
+      // Un ejercicio compartido entre días (mismo id) puede haberse
+      // entrenado bajo cualquiera de esos días, y el campo `dia` de la
+      // sesión en HC no siempre es confiable (ver construirSesiones): antes
+      // de que existiera `sesionesFechas`, cualquier sesión que tocara un
+      // ejercicio compartido podía quedar etiquetada con el día equivocado.
+      // Por eso, para ejercicios compartidos se busca en TODAS las
+      // sesiones por nombre, sin filtrar por día — total, comparten el
+      // mismo historial sin importar bajo cuál día se entrenaron.
+      const esCompartido = diasDondeAparece(dias, ej.id).length > 1;
+      const sesionesDelDia = esCompartido ? sesiones : sesiones.filter(enEsteDia);
+
+      // Entradas que HC tiene para este ejercicio. El match es por nombre
+      // normalizado y no por string exacto: la sesión no guarda el id, así
+      // que el nombre es el único vínculo, y un espacio de más o una tilde
+      // codificada distinta —invisibles en pantalla— dejarían al ejercicio
+      // sin recuperar nada. Ver domain/nombre.js.
+      const desdeHC = sesionesDelDia.flatMap((s) => {
+        const ejHC = s.ejercicios.find((e) => mismoNombre(e.nombre, ej.nombre));
+        if (!ejHC) return [];
+        // HC gana, pero sólo donde HC tiene dato: un campo que no trae no
+        // puede borrar el local. Así es como las entradas de cardio
+        // perdían sus minutos —HC nunca los tuvo, así que cada "traer
+        // historial" los pisaba con undefined— y no volvían nunca más.
+        const local = (ej.historial ?? []).find((h) => h.fecha === s.fecha);
+        const preferir = (deHC, deLocal) => (deHC === undefined ? deLocal : deHC);
+        return [
+          ej.tipo === "cardio"
+            ? {
+                fecha: s.fecha,
+                duracion: preferir(ejHC.duracion, local?.duracion),
+                distancia: preferir(ejHC.distancia, local?.distancia),
+              }
+            : {
+                fecha: s.fecha,
+                series: seriesPara(ej, preferir(ejHC.series, local?.series)),
+              },
+        ];
+      });
+
+      // FUSIONA con el historial local en vez de reemplazarlo: así no se
+      // pierde el historial de ejercicios que nunca llegaron a HC (p.ej.
+      // sesiones hechas con auto-sync apagado). Ante la misma fecha gana HC.
+      const porFecha = new Map();
+      (ej.historial ?? []).forEach((h) => porFecha.set(h.fecha, h));
+      desdeHC.forEach((h) => porFecha.set(h.fecha, h));
+      const historial = [...porFecha.values()]
+        .sort((a, b) => a.fecha.localeCompare(b.fecha))
+        .slice(-40);
+
+      if (ej.tipo === "cardio") {
+        return { ...ej, historial };
+      }
+      const ultimaSerie = historial[historial.length - 1]?.series;
+      if (ej.tipo === "tiempo") {
+        const ultimoObjetivo =
+          ultimaSerie?.length ? Math.max(...ultimaSerie.map((s) => s.segundos)) : ej.duracionObjetivo;
+        return { ...ej, historial, duracionObjetivo: historial.length > 0 ? ultimoObjetivo : ej.duracionObjetivo };
+      }
+      const ultimoPeso =
+        ultimaSerie?.length ? Math.max(...ultimaSerie.map((s) => s.peso)) : ej.peso;
+      return { ...ej, historial, peso: historial.length > 0 ? ultimoPeso : ej.peso };
+    });
+
+    // ── 2. ultimaSesion ─────────────────────────────────────────────────────
+    // Primero intenta con sesiones de nombre exacto. Si no hay ninguna
+    // (historial antiguo con nombres compuestos), infiere desde los
+    // ejercicios exclusivos de este día: sólo aparecen en las sesiones del
+    // día correcto, así que su última fecha es la última vez que se entrenó.
     const sesionesExactas = sesiones.filter((s) => s.dia === dia.nombre);
     const fechasExactas = sesionesExactas.map((s) => s.fecha).sort();
-    const ultimaSesionHC = fechasExactas[fechasExactas.length - 1] ?? null;
+    let ultimaSesionHC = fechasExactas[fechasExactas.length - 1] ?? null;
+
+    if (!ultimaSesionHC) {
+      const exclusivos = ejerciciosActualizados.filter(
+        (ej) => diasDondeAparece(dias, ej.id).length === 1
+      );
+      const fechas = exclusivos.flatMap((ej) => ej.historial.map((h) => h.fecha)).sort();
+      ultimaSesionHC = fechas[fechas.length - 1] ?? null;
+    }
+
     // La más reciente entre la local (puede haber sesiones offline aún no
     // pusheadas) y la de HC.
     const ultimaSesion = !dia.ultimaSesion
@@ -147,79 +237,25 @@ export function aplicarSesiones(dias, sesiones) {
       : !ultimaSesionHC || dia.ultimaSesion > ultimaSesionHC
       ? dia.ultimaSesion
       : ultimaSesionHC;
-    // Merge sesionesFechas: union de fechas locales (offline) y las de HC.
+
+    // ── 3. sesionesFechas ───────────────────────────────────────────────────
+    // Usamos fechas exactas si las hay; si no, las inferidas de exclusivos.
+    const fechasInferidas =
+      fechasExactas.length > 0
+        ? fechasExactas
+        : ejerciciosActualizados
+            .filter((ej) => diasDondeAparece(dias, ej.id).length === 1)
+            .flatMap((ej) => ej.historial.map((h) => h.fecha));
     const sesionesFechasMerge =
-      fechasExactas.length > 0 || (dia.sesionesFechas?.length ?? 0) > 0
-        ? [...new Set([...(dia.sesionesFechas ?? []), ...fechasExactas])].sort()
+      fechasInferidas.length > 0 || (dia.sesionesFechas?.length ?? 0) > 0
+        ? [...new Set([...(dia.sesionesFechas ?? []), ...fechasInferidas])].sort()
         : undefined;
 
     return {
       ...dia,
       ...(ultimaSesion != null && { ultimaSesion }),
       ...(sesionesFechasMerge != null && { sesionesFechas: sesionesFechasMerge }),
-      ejercicios: dia.ejercicios.map((ej) => {
-        // Un ejercicio compartido entre días (mismo id) puede haberse
-        // entrenado bajo cualquiera de esos días, y el campo `dia` de la
-        // sesión en HC no siempre es confiable (ver construirSesiones): antes
-        // de que existiera `sesionesFechas`, cualquier sesión que tocara un
-        // ejercicio compartido podía quedar etiquetada con el día equivocado.
-        // Por eso, para ejercicios compartidos se busca en TODAS las
-        // sesiones por nombre, sin filtrar por día — total, comparten el
-        // mismo historial sin importar bajo cuál día se entrenaron.
-        const esCompartido = diasDondeAparece(dias, ej.id).length > 1;
-        const sesionesDelDia = esCompartido ? sesiones : sesiones.filter((s) => s.dia === dia.nombre);
-
-        // Entradas que HC tiene para este ejercicio. El match es por nombre
-        // normalizado y no por string exacto: la sesión no guarda el id, así
-        // que el nombre es el único vínculo, y un espacio de más o una tilde
-        // codificada distinta —invisibles en pantalla— dejarían al ejercicio
-        // sin recuperar nada. Ver domain/nombre.js.
-        const desdeHC = sesionesDelDia.flatMap((s) => {
-          const ejHC = s.ejercicios.find((e) => mismoNombre(e.nombre, ej.nombre));
-          if (!ejHC) return [];
-          // HC gana, pero sólo donde HC tiene dato: un campo que no trae no
-          // puede borrar el local. Así es como las entradas de cardio
-          // perdían sus minutos —HC nunca los tuvo, así que cada "traer
-          // historial" los pisaba con undefined— y no volvían nunca más.
-          const local = (ej.historial ?? []).find((h) => h.fecha === s.fecha);
-          const preferir = (deHC, deLocal) => (deHC === undefined ? deLocal : deHC);
-          return [
-            ej.tipo === "cardio"
-              ? {
-                  fecha: s.fecha,
-                  duracion: preferir(ejHC.duracion, local?.duracion),
-                  distancia: preferir(ejHC.distancia, local?.distancia),
-                }
-              : {
-                  fecha: s.fecha,
-                  series: seriesPara(ej, preferir(ejHC.series, local?.series)),
-                },
-          ];
-        });
-
-        // FUSIONA con el historial local en vez de reemplazarlo: así no se
-        // pierde el historial de ejercicios que nunca llegaron a HC (p.ej.
-        // sesiones hechas con auto-sync apagado). Ante la misma fecha gana HC.
-        const porFecha = new Map();
-        (ej.historial ?? []).forEach((h) => porFecha.set(h.fecha, h));
-        desdeHC.forEach((h) => porFecha.set(h.fecha, h));
-        const historial = [...porFecha.values()]
-          .sort((a, b) => a.fecha.localeCompare(b.fecha))
-          .slice(-40);
-
-        if (ej.tipo === "cardio") {
-          return { ...ej, historial };
-        }
-        const ultimaSerie = historial[historial.length - 1]?.series;
-        if (ej.tipo === "tiempo") {
-          const ultimoObjetivo =
-            ultimaSerie?.length ? Math.max(...ultimaSerie.map((s) => s.segundos)) : ej.duracionObjetivo;
-          return { ...ej, historial, duracionObjetivo: historial.length > 0 ? ultimoObjetivo : ej.duracionObjetivo };
-        }
-        const ultimoPeso =
-          ultimaSerie?.length ? Math.max(...ultimaSerie.map((s) => s.peso)) : ej.peso;
-        return { ...ej, historial, peso: historial.length > 0 ? ultimoPeso : ej.peso };
-      }),
+      ejercicios: ejerciciosActualizados,
     };
   });
 }

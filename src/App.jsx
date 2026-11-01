@@ -45,6 +45,11 @@ export default function App() {
         if (token) {
           const sinHistorial = !diasLocales ||
             diasLocales.every((d) => d.ejercicios.every((e) => !e.historial?.length));
+          // Migración: si hay historial pero ultimaSesion falta en todos los
+          // días (estado generado antes de que aplicarSesiones lo reconstruyera),
+          // traer sesiones para reconstruirlo sin tocar la rutina.
+          const faltaUltimaSesion = !sinHistorial &&
+            diasLocales.every((d) => d.ultimaSesion == null);
           if (sinHistorial) {
             try {
               const [{ rutina }, { sesiones }] = await Promise.all([
@@ -56,6 +61,11 @@ export default function App() {
               } else {
                 setDias((prev) => resincronizarCompartidos(aplicarSesiones(prev, sesiones)));
               }
+            } catch (_) {}
+          } else if (faltaUltimaSesion) {
+            try {
+              const { sesiones } = await fetchSesiones(token);
+              setDias((prev) => resincronizarCompartidos(aplicarSesiones(prev, sesiones)));
             } catch (_) {}
           }
         }

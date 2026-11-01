@@ -78,4 +78,10 @@ Sin CSS externo ni Tailwind — todo inline styles. Paleta y tipografía central
 
 ## Despliegue
 
-Railway sirve el build estático con `serve -s dist`. El puerto lo inyecta Railway via `$PORT`. No hay servidor Node propio.
+Render sirve la PWA como **Static Site** desde su CDN (config en `render.yaml`). Build: `npm ci && npm run build`, publica `./dist`. No hay servidor Node propio. El origen público es `https://gymt.sparkio.me`. (Antes estaba en Railway con `serve -s dist`; ver `package.json` script `start`, que quedó como fallback.)
+
+Detalles del blueprint: rewrite SPA de `/*` → `/index.html`, y `Cache-Control: no-cache` para `sw.js`/`registerSW.js`/`index.html` (así la PWA no queda pegada a un build viejo) vs. cache inmutable para `/assets/*` (nombres con hash).
+
+### Sync remota (backend externo)
+
+La sync opcional pega contra un backend Django en `https://hm.sparkio.me` (ver `src/sync/hcAdapter.js`, constante `HC_URL`) — repo aparte, no está acá. Como el frontend y el backend viven en orígenes distintos, el backend debe tener el origen de la PWA (`https://gymt.sparkio.me`) en `CORS_ALLOWED_ORIGINS` (django-cors-headers). Si falta, el browser bloquea la respuesta y `fetch()` falla con "No se pudo llegar a hm.sparkio.me" aunque el servidor esté vivo. Al cambiar el dominio del frontend hay que sumarlo a esa allowlist.

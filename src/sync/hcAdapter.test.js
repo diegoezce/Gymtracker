@@ -188,6 +188,63 @@ describe("aplicarSesiones con ejercicio compartido entre días", () => {
   });
 });
 
+describe("aplicarSesiones reconstruye ultimaSesion y sesionesFechas", () => {
+  it("asigna ultimaSesion al día con nombre exacto, ignorando otros días", () => {
+    const dias = [
+      { id: "a", nombre: "Día A", ejercicios: [] },
+      { id: "c", nombre: "Día C", ejercicios: [] },
+    ];
+    const sesiones = [
+      { fecha: "2026-10-26", dia: "Día C", ejercicios: [] },
+      { fecha: "2026-10-28", dia: "Día A", ejercicios: [] },
+    ];
+    const resultado = aplicarSesiones(dias, sesiones);
+    expect(resultado.find((d) => d.id === "c").ultimaSesion).toBe("2026-10-26");
+    expect(resultado.find((d) => d.id === "a").ultimaSesion).toBe("2026-10-28");
+  });
+
+  it("ignora sesiones con nombre compuesto al calcular ultimaSesion", () => {
+    const dias = [{ id: "c", nombre: "Día C", ejercicios: [] }];
+    const sesiones = [
+      { fecha: "2026-10-23", dia: "Día A + Día B + Día C", ejercicios: [] },
+      { fecha: "2026-10-26", dia: "Día C", ejercicios: [] },
+    ];
+    const resultado = aplicarSesiones(dias, sesiones);
+    expect(resultado[0].ultimaSesion).toBe("2026-10-26");
+  });
+
+  it("la ultimaSesion local más reciente (offline) sobrevive al sync", () => {
+    const dias = [{ id: "a", nombre: "Día A", ultimaSesion: "2026-10-31", ejercicios: [] }];
+    const sesiones = [{ fecha: "2026-10-28", dia: "Día A", ejercicios: [] }];
+    const resultado = aplicarSesiones(dias, sesiones);
+    expect(resultado[0].ultimaSesion).toBe("2026-10-31");
+  });
+
+  it("caso real: C=26/10 A=28/10 B=30/10 con ejercicios compartidos → ultimaSesion de C es 26/10", () => {
+    // Reproduce el bug: sin este fix, la última fecha de Día C quedaba en
+    // 28/10 porque los ejercicios compartidos con Día A traían esa fecha.
+    const dias = [
+      {
+        id: "a",
+        nombre: "Día A",
+        ejercicios: [{ id: "prensa", tipo: "fuerza", nombre: "Prensa de piernas", peso: 80, historial: [] }],
+      },
+      {
+        id: "c",
+        nombre: "Día C",
+        ejercicios: [{ id: "prensa", tipo: "fuerza", nombre: "Prensa de piernas", peso: 80, historial: [] }],
+      },
+    ];
+    const sesiones = [
+      { fecha: "2026-10-26", dia: "Día C", ejercicios: [{ nombre: "Prensa de piernas", series: [{ peso: 80, reps: 10, rir: 1 }] }] },
+      { fecha: "2026-10-28", dia: "Día A", ejercicios: [{ nombre: "Prensa de piernas", series: [{ peso: 82, reps: 10, rir: 1 }] }] },
+    ];
+    const resultado = aplicarSesiones(dias, sesiones);
+    expect(resultado.find((d) => d.id === "c").ultimaSesion).toBe("2026-10-26");
+    expect(resultado.find((d) => d.id === "a").ultimaSesion).toBe("2026-10-28");
+  });
+});
+
 describe("construirSesiones con sesión mixta (fuerza + tiempo)", () => {
   it("da un volumen_kg numérico en vez de NaN cuando hay un ejercicio de tiempo ese día", () => {
     const dias = [

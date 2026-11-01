@@ -11,7 +11,13 @@ export const fechaCorta = (iso) => {
 };
 
 export const diasDesdeStr = (iso) => {
-  const diff = Math.floor((Date.now() - new Date(iso)) / 86400000);
+  // Parsear como medianoche local para que el conteo sea por días calendario
+  // locales, no por diferencia UTC (que puede correr un día en UTC-3).
+  const [y, m, d] = iso.split("-").map(Number);
+  const fecha = new Date(y, m - 1, d);
+  const ahora = new Date();
+  const hoyMidnight = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+  const diff = Math.round((hoyMidnight - fecha) / 86400000);
   if (diff === 0) return "hoy";
   if (diff === 1) return "ayer";
   return `hace ${diff} días`;

@@ -32,6 +32,15 @@ describe("sugerirDia", () => {
     expect(sugerirDia(undefined)).toBeNull();
   });
 
+  it("caso real: C=26/10, A=28/10, B=30/10, hoy 01/11 → sugiere C", () => {
+    const dias = [
+      dia("a", "Día A", "2026-10-28"),
+      dia("b", "Día B", "2026-10-30"),
+      dia("c", "Día C", "2026-10-26"),
+    ];
+    expect(sugerirDia(dias).id).toBe("c");
+  });
+
   it("cae al historial de los ejercicios si el día no tiene ultimaSesion", () => {
     // Días anteriores a que existiera el campo ultimaSesion.
     const dias = [

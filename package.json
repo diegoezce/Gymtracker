@@ -1,7 +1,7 @@
 {
   "name": "gymtracker",
   "private": true,
-  "version": "0.1.47",
+  "version": "0.1.48",
   "type": "module",
   "engines": {
     "node": ">=20"

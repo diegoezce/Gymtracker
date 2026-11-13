@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { C, MONO, SANS } from "../theme";
-import { fmt, diasDesdeStr } from "../utils/format";
+import { fmt, diasDesdeStr, hoy } from "../utils/format";
+import { haceCuanto, solapamientosDelDia } from "../domain/solapamiento";
 import { ejerciciosVinculables } from "../domain/rutina";
 import { Marco } from "./Marco";
 import { Cabecera } from "./Cabecera";
@@ -76,6 +77,11 @@ export function DiaMenu({
   onPausar,
   onAgregarEjercicio,
 }) {
+  // Qué ejercicios de este día ya se trabajaron hace poco en el otro grupo
+  // (día extra ↔ días fijos). Se calcula de `dias`, que ya está en memoria:
+  // no hay ninguna lectura extra, ni a HM ni a storage.
+  const solapamientos = solapamientosDelDia(dias, dia, hoy());
+
   const [agregando, setAgregando] = useState(false);
   const [confirmandoSalir, setConfirmandoSalir] = useState(false);
   const total = dia.ejercicios.filter((e) => !saltados[e.id]).length;
@@ -121,6 +127,9 @@ export function DiaMenu({
         <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
           {dia.ejercicios.map((e, idx) => {
             const hecho = !!hechos[e.id];
+            // Aviso de solapamiento con el día extra (ver domain/solapamiento).
+            // No cambia nada del ejercicio: sólo avisa.
+            const solapado = !hecho && !saltados[e.id] ? solapamientos[e.id] : null;
             const saltado = !hecho && !!saltados[e.id];
             const parcial = !hecho && !saltado && progreso[e.id]?.series?.length > 0 ? progreso[e.id] : null;
             const ultima = e.historial[e.historial.length - 1];
@@ -131,7 +140,7 @@ export function DiaMenu({
                   display: "flex",
                   alignItems: "stretch",
                   background: C.sup,
-                  border: `1px solid ${hecho ? C.verde : parcial ? C.sodio : C.linea}`,
+                  border: `1px solid ${hecho ? C.verde : parcial ? C.sodio : solapado ? C.oxido : C.linea}`,
                   borderRadius: 4,
                   overflow: "hidden",
                   opacity: hecho ? 0.55 : saltado ? 0.4 : 1,
@@ -200,6 +209,11 @@ export function DiaMenu({
                       ? `última vez: ${diasDesdeStr(ultima.fecha)}`
                       : "todavía no hecho"}
                   </div>
+                  {solapado && (
+                    <div style={{ fontFamily: MONO, fontSize: 11, color: C.oxido, marginTop: 4 }}>
+                      Ya hecho en {solapado.dia} · {haceCuanto(solapado.fecha, hoy())}
+                    </div>
+                  )}
                 </button>
 
                 {!hecho && (

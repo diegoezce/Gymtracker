@@ -14,6 +14,8 @@ const haceDias = (n) => {
 };
 
 // Ejercicio compartido entre A y D: mismo id, mismo historial.
+const serie2 = () => ({ fecha: haceDias(2), series: [] });
+
 const triceps = (historial) => ({
   id: "extensintrcepsenpoleau477",
   nombre: "Extensión tríceps en polea",
@@ -150,5 +152,23 @@ describe("haceCuanto", () => {
     expect(haceCuanto(HOY, HOY)).toBe("hoy");
     expect(haceCuanto(haceDias(1), HOY)).toBe("ayer");
     expect(haceCuanto(haceDias(2), HOY)).toBe("hace 2 días");
+  });
+});
+
+describe("si el día extra deja de existir", () => {
+  // Borrar el Día D no deja la constante DIAS_EXTRA apuntando a nada
+  // peligroso: simplemente no hay con quién cruzar.
+  const sinExtra = [
+    { id: "a", nombre: "Día A", sesionesFechas: [haceDias(2)], ejercicios: [triceps([serie2()])] },
+    { id: "b", nombre: "Día B", sesionesFechas: [], ejercicios: [triceps([serie2()])] },
+  ];
+
+  it("no rompe", () => {
+    expect(() => solapamientosDelDia(sinExtra, sinExtra[0], HOY)).not.toThrow();
+  });
+
+  it("deja de avisar, sin inventar avisos entre los días que quedan", () => {
+    expect(solapamientosDelDia(sinExtra, sinExtra[0], HOY)).toEqual({});
+    expect(hechoEnOtroDia(sinExtra, sinExtra[1], sinExtra[1].ejercicios[0], HOY)).toBeNull();
   });
 });

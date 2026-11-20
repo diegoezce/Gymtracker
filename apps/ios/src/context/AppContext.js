@@ -25,6 +25,7 @@ import { hoy } from "@gymtracker/core/utils/format";
 
 const CLAVE_RUTINA = "gym:estado:v1";
 const CLAVE_SESION = "gym:sesion:v1";
+const CLAVE_ONBOARDING = "gym:onboarding:v1";
 
 export const AppContext = createContext(null);
 export const useApp = () => useContext(AppContext);
@@ -36,6 +37,7 @@ export function AppProvider({ children }) {
   const [sesionPausada, setSesionPausada] = useState(false);
   const [aviso, setAviso] = useState("");
   const [resumen, setResumen] = useState(null);
+  const [onboardingDone, setOnboardingDone] = useState(false);
   const primeraCarga = useRef(true);
 
   // Carga inicial
@@ -56,6 +58,10 @@ export function AppProvider({ children }) {
             tiempo: guardada.tiempo ? reanudarReloj(guardada.tiempo) : guardada.tiempo,
           });
         }
+      } catch {}
+      try {
+        const ob = await storage.get(CLAVE_ONBOARDING);
+        if (ob?.value === "done") setOnboardingDone(true);
       } catch {}
       setCargando(false);
     })();
@@ -295,6 +301,11 @@ export function AppProvider({ children }) {
     setSesion(editarSerieEnSesion(sesion, idx, campo, valor));
   };
 
+  const completarOnboarding = () => {
+    setOnboardingDone(true);
+    storage.set(CLAVE_ONBOARDING, "done").catch(() => {});
+  };
+
   // Cierra el ejercicio actual con las series que ya se tienen (sin agregar una nueva)
   const terminarEjercicioActual = (onDone) => {
     const ej = getEj();
@@ -315,6 +326,8 @@ export function AppProvider({ children }) {
     <AppContext.Provider
       value={{
         cargando,
+        onboardingDone,
+        completarOnboarding,
         dias,
         sesion,
         sesionPausada,

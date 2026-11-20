@@ -1,0 +1,17 @@
+{
+  "name": "@gymtracker/core",
+  "private": true,
+  "version": "0.1.49",
+  "type": "module",
+  "exports": {
+    "./domain/*": "./src/domain/*.js",
+    "./utils/*": "./src/utils/*.js"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.8"
+  }
+}

@@ -1,8 +1,9 @@
 import { useState } from "react";
 import {
   View, Text, TouchableOpacity, ScrollView,
-  StyleSheet, Modal, SafeAreaView,
+  StyleSheet, Modal,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { fmt, diasDesdeStr, hoy } from "@gymtracker/core/utils/format";
 import { haceCuanto, solapamientosDelDia } from "@gymtracker/core/domain/solapamiento";
 import { useApp } from "../context/AppContext";

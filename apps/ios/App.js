@@ -1,3 +1,4 @@
+import { registerRootComponent } from "expo";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { StatusBar } from "expo-status-bar";
@@ -9,6 +10,7 @@ import { SesionScreen } from "./src/screens/SesionScreen";
 import { ProgresoScreen } from "./src/screens/ProgresoScreen";
 import { ResumenScreen } from "./src/screens/ResumenScreen";
 import { View, ActivityIndicator } from "react-native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { C } from "./src/theme";
 
 const Stack = createNativeStackNavigator();
@@ -39,13 +41,17 @@ function RootNavigator() {
   );
 }
 
-export default function App() {
+function App() {
   return (
-    <AppProvider>
-      <StatusBar style="light" />
-      <NavigationContainer>
-        <RootNavigator />
-      </NavigationContainer>
-    </AppProvider>
+    <SafeAreaProvider>
+      <AppProvider>
+        <StatusBar style="light" />
+        <NavigationContainer>
+          <RootNavigator />
+        </NavigationContainer>
+      </AppProvider>
+    </SafeAreaProvider>
   );
 }
+
+registerRootComponent(App);

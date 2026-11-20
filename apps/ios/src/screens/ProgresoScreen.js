@@ -1,8 +1,9 @@
 import { useState } from "react";
 import {
   View, Text, TouchableOpacity, ScrollView,
-  StyleSheet, SafeAreaView,
+  StyleSheet,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { fmt, fechaCorta, diasDesdeStr } from "@gymtracker/core/utils/format";
 import { contarSesiones } from "@gymtracker/core/domain/inicio";
 import { useApp } from "../context/AppContext";

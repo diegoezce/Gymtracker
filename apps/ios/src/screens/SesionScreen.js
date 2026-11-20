@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import {
   View, Text, TouchableOpacity, ScrollView,
-  StyleSheet, SafeAreaView,
+  StyleSheet,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { fmt, hoy } from "@gymtracker/core/utils/format";
 import { sugerirPeso, describirBase } from "@gymtracker/core/domain/progression";

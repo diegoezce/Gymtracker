@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { storage, CLAVE_RUTINA, CLAVE_SESION } from "./storage";
-import { RUTINA_INICIAL, actualizarCompartido, vincularEjercicio, resincronizarCompartidos, agregarEntradaHistorial, editarEntradaHistorial, eliminarEntradaHistorial, fusionarEjercicios, marcarSesionDia, registrarDuracion } from "./domain/rutina";
+import { RUTINA_INICIAL, actualizarCompartido, vincularEjercicio, resincronizarCompartidos, agregarEntradaHistorial, editarEntradaHistorial, eliminarEntradaHistorial, fusionarEjercicios, marcarSesionDia, registrarDuracion } from "@gymtracker/core/domain/rutina";
 import { leerToken, leerAutoSync, fetchSesiones, aplicarSesiones, pushSesiones, construirSesiones, fetchRutina, aplicarRutina, SYNC_KEY, TOKEN_KEY } from "./sync/hcAdapter";
-import { progresar, aprender } from "./domain/progression";
-import { olvidarProgreso, entradasAVolcar, instantaneaCierre, reabrirEjercicio as deshacerCierre, iniciarReloj, pausarReloj, reanudarReloj, minutosDeSesion } from "./domain/sesion";
-import { resumenSesion } from "./domain/resumen";
-import { hoy } from "./utils/format";
+import { progresar, aprender } from "@gymtracker/core/domain/progression";
+import { olvidarProgreso, entradasAVolcar, instantaneaCierre, reabrirEjercicio as deshacerCierre, iniciarReloj, pausarReloj, reanudarReloj, minutosDeSesion } from "@gymtracker/core/domain/sesion";
+import { resumenSesion } from "@gymtracker/core/domain/resumen";
+import { hoy } from "@gymtracker/core/utils/format";
 import { Marco } from "./components/Marco";
 import { Inicio } from "./components/Inicio";
 import { DiaMenu } from "./components/DiaMenu";

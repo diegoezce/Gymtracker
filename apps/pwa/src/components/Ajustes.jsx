@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { version } from "../../package.json";
 import { C, MONO, SANS } from "../theme";
-import { exportarRutina, importarRutina, resumenDias } from "../domain/compartir";
+import { exportarRutina, importarRutina, resumenDias } from "@gymtracker/core/domain/compartir";
 import {
   actualizarCompartido,
   diasDondeAparece,
@@ -13,8 +13,8 @@ import {
   fusionarDias,
   convertirATiempo,
   eliminarEjercicioDeTodos,
-} from "../domain/rutina";
-import { achicar, faltaSubir, tieneImagen } from "../domain/imagen";
+} from "@gymtracker/core/domain/rutina";
+import { achicar, faltaSubir, tieneImagen } from "@gymtracker/core/domain/imagen";
 import { borrarFoto, guardarFoto, leerFoto, nuevoId } from "../storage/fotosLocal";
 import { borrarRemota, subirFoto } from "../sync/fotos";
 import { FotoEjercicio } from "./FotoEjercicio";

@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "Gymtracker",
+    "slug": "gymtracker",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "bundleIdentifier": "me.sparkio.gymtracker",
+      "supportsTablet": false
+    },
+    "android": {
+      "package": "me.sparkio.gymtracker"
+    }
+  }
+}

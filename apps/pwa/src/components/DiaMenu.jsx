@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { C, MONO, SANS } from "../theme";
-import { fmt, diasDesdeStr, hoy } from "../utils/format";
-import { haceCuanto, solapamientosDelDia } from "../domain/solapamiento";
-import { ejerciciosVinculables } from "../domain/rutina";
+import { fmt, diasDesdeStr, hoy } from "@gymtracker/core/utils/format";
+import { haceCuanto, solapamientosDelDia } from "@gymtracker/core/domain/solapamiento";
+import { ejerciciosVinculables } from "@gymtracker/core/domain/rutina";
 import { Marco } from "./Marco";
 import { Cabecera } from "./Cabecera";
 import { Boton } from "./Boton";

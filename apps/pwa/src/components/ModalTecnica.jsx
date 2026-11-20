@@ -1,5 +1,5 @@
 import { C, SANS } from "../theme";
-import { tieneImagen } from "../domain/imagen";
+import { tieneImagen } from "@gymtracker/core/domain/imagen";
 import { FotoEjercicio } from "./FotoEjercicio";
 
 export function ModalTecnica({ ej, onCerrar }) {

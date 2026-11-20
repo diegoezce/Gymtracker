@@ -1,5 +1,5 @@
-import { diasDondeAparece, duracionRegistrada } from "../domain/rutina";
-import { mismoNombre } from "../domain/nombre";
+import { diasDondeAparece, duracionRegistrada } from "@gymtracker/core/domain/rutina";
+import { mismoNombre } from "@gymtracker/core/domain/nombre";
 
 const HC_URL = "https://hm.sparkio.me";
 export const HC_HOST = HC_URL.replace(/^https?:\/\//, "");

@@ -5,8 +5,8 @@ services:
   - type: web
     runtime: static
     name: gymtracker
-    buildCommand: npm ci && npm run build
-    staticPublishPath: ./dist
+    buildCommand: npm ci && npm run build -w @gymtracker/pwa
+    staticPublishPath: ./apps/pwa/dist
     pullRequestPreviewsEnabled: true
 
     # SPA + PWA: cualquier ruta que no sea un archivo real cae a index.html.

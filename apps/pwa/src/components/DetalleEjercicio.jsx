@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { C, MONO, SANS } from "../theme";
-import { fmt, hoy } from "../utils/format";
-import { ejerciciosFusionables } from "../domain/rutina";
+import { fmt, hoy } from "@gymtracker/core/utils/format";
+import { ejerciciosFusionables } from "@gymtracker/core/domain/rutina";
 import { Marco } from "./Marco";
 import { Cabecera } from "./Cabecera";
 import { Boton } from "./Boton";

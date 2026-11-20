@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { C, SANS } from "../theme";
-import { fuenteImagen } from "../domain/imagen";
+import { fuenteImagen } from "@gymtracker/core/domain/imagen";
 import { guardarFoto, leerFoto } from "../storage/fotosLocal";
 import { bajarFoto } from "../sync/fotos";
 import { leerToken } from "../sync/hcAdapter";

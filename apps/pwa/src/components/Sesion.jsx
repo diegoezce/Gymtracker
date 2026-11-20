@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { C, MONO, SANS } from "../theme";
 import { barra } from "../styles/helpers";
-import { fmt, hoy } from "../utils/format";
-import { describirBase, sugerirPeso } from "../domain/progression";
-import { tieneImagen } from "../domain/imagen";
-import { editarSerie as editarSerieEnSesion, iniciarReloj, pausarReloj, reanudarReloj, segundosDeReloj, minutosDeCardio } from "../domain/sesion";
+import { fmt, hoy } from "@gymtracker/core/utils/format";
+import { describirBase, sugerirPeso } from "@gymtracker/core/domain/progression";
+import { tieneImagen } from "@gymtracker/core/domain/imagen";
+import { editarSerie as editarSerieEnSesion, iniciarReloj, pausarReloj, reanudarReloj, segundosDeReloj, minutosDeCardio } from "@gymtracker/core/domain/sesion";
 import { Marco } from "./Marco";
 import { Cabecera } from "./Cabecera";
 import { Etiqueta } from "./Etiqueta";

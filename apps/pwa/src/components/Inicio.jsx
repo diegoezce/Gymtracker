@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { C, MONO, SANS } from "../theme";
-import { diasDesdeStr } from "../utils/format";
-import { sugerirDia, ultimaVezDia, contarSesiones, descripcionDia } from "../domain/inicio";
+import { diasDesdeStr } from "@gymtracker/core/utils/format";
+import { sugerirDia, ultimaVezDia, contarSesiones, descripcionDia } from "@gymtracker/core/domain/inicio";
 import { Marco } from "./Marco";
 import { Etiqueta } from "./Etiqueta";
 import { Boton } from "./Boton";

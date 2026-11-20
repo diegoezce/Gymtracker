@@ -1,5 +1,5 @@
 import { C, MONO, SANS } from "../theme";
-import { fmt, fechaCorta } from "../utils/format";
+import { fmt, fechaCorta } from "@gymtracker/core/utils/format";
 import { Marco } from "./Marco";
 import { Cabecera } from "./Cabecera";
 import { Etiqueta } from "./Etiqueta";

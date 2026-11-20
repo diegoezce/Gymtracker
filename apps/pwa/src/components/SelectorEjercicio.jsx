@@ -5,8 +5,8 @@ import {
   ejercicio as nuevoEjercicioFactory,
   ejercicioCardio as nuevoCardioFactory,
   ejercicioTiempo as nuevoTiempoFactory,
-} from "../domain/rutina";
-import { fmt } from "../utils/format";
+} from "@gymtracker/core/domain/rutina";
+import { fmt } from "@gymtracker/core/utils/format";
 import { Marco } from "./Marco";
 import { Cabecera } from "./Cabecera";
 import { Boton } from "./Boton";

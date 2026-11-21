@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Gymtracker",
+    "name": "IronWorks: Gym Tracker",
     "slug": "gymtracker",
     "version": "0.1.0",
     "orientation": "portrait",
@@ -9,7 +9,7 @@
     "ios": {
       "bundleIdentifier": "me.sparkio.gymtracker",
       "supportsTablet": false,
-      "buildNumber": "4",
+      "buildNumber": "5",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }

@@ -7,7 +7,6 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useApp } from "../context/AppContext";
 import { Boton } from "../components/Boton";
 import { C, MONO } from "../theme";
-import { actualizarCompartido } from "@gymtracker/core/domain/rutina";
 
 function Campo({ label, value, onChange, decimal }) {
   return (
@@ -122,11 +121,11 @@ const m = StyleSheet.create({
 });
 
 export function AjustesScreen({ navigation }) {
-  const { dias, setDias } = useApp();
+  const { dias, actualizarEjercicio } = useApp();
   const [ejEditando, setEjEditando] = useState(null);
 
   const guardarEjercicio = (ejId, cambios) => {
-    setDias((prev) => actualizarCompartido(prev, ejId, cambios));
+    actualizarEjercicio(ejId, cambios);
     setEjEditando(null);
   };
 

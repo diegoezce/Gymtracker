@@ -301,6 +301,10 @@ export function AppProvider({ children }) {
     setSesion(editarSerieEnSesion(sesion, idx, campo, valor));
   };
 
+  const actualizarEjercicio = (ejId, cambios) => {
+    setDias((prev) => actualizarCompartido(prev, ejId, cambios));
+  };
+
   const completarOnboarding = () => {
     setOnboardingDone(true);
     storage.set(CLAVE_ONBOARDING, "done").catch(() => {});
@@ -351,6 +355,7 @@ export function AppProvider({ children }) {
         reabrirEjercicio,
         editarSerie,
         terminarEjercicioActual,
+        actualizarEjercicio,
         setSesion,
       }}
     >

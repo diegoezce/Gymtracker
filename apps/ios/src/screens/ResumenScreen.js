@@ -25,7 +25,7 @@ export function ResumenScreen({ navigation }) {
 
   const volver = () => {
     setResumen(null);
-    navigation.navigate("Inicio");
+    navigation.reset({ index: 0, routes: [{ name: "Inicio" }] });
   };
 
   if (!resumen) { volver(); return null; }

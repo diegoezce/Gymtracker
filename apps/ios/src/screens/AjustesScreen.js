@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   View, Text, TouchableOpacity, ScrollView,
-  StyleSheet, Modal, TextInput, KeyboardAvoidingView, Platform, Alert,
+  StyleSheet, Modal, TextInput, KeyboardAvoidingView, Platform, Alert, Keyboard,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useApp } from "../context/AppContext";
@@ -149,67 +149,69 @@ function ModalAgregarEjercicio({ diaId, onGuardar, onCerrar }) {
 
   return (
     <Modal transparent animationType="slide" onRequestClose={onCerrar}>
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
-        <TouchableOpacity style={m.overlay} activeOpacity={1} onPress={onCerrar}>
-          <TouchableOpacity activeOpacity={1} style={m.sheet}>
+      <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
+        <TouchableOpacity style={m.overlay} activeOpacity={1} onPress={() => { Keyboard.dismiss(); onCerrar(); }}>
+          <TouchableOpacity activeOpacity={1} style={[m.sheet, { maxHeight: "90%" }]}>
             <View style={m.handle} />
-            <Text style={m.nombre}>Nuevo ejercicio</Text>
+            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+              <Text style={m.nombre}>Nuevo ejercicio</Text>
 
-            <Text style={f.label}>NOMBRE</Text>
-            <TextInput
-              style={[f.input, { textAlign: "left", marginBottom: 16 }]}
-              value={nombre}
-              onChangeText={setNombre}
-              placeholder="Ej: Press banca"
-              placeholderTextColor={C.gris}
-              autoFocus
-            />
+              <Text style={f.label}>NOMBRE</Text>
+              <TextInput
+                style={[f.input, { textAlign: "left", marginBottom: 16 }]}
+                value={nombre}
+                onChangeText={setNombre}
+                placeholder="Ej: Press banca"
+                placeholderTextColor={C.gris}
+                autoFocus
+              />
 
-            <Text style={[f.label, { marginBottom: 8 }]}>TIPO</Text>
-            <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
-              {TIPOS.map((t) => (
-                <TouchableOpacity
-                  key={t.v}
-                  onPress={() => setTipo(t.v)}
-                  style={[m.tipoBtn, tipo === t.v && m.tipoBtnActivo]}
-                >
-                  <Text style={[m.tipoBtnTxt, tipo === t.v && { color: "#14120F" }]}>{t.l}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+              <Text style={[f.label, { marginBottom: 8 }]}>TIPO</Text>
+              <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
+                {TIPOS.map((t) => (
+                  <TouchableOpacity
+                    key={t.v}
+                    onPress={() => setTipo(t.v)}
+                    style={[m.tipoBtn, tipo === t.v && m.tipoBtnActivo]}
+                  >
+                    <Text style={[m.tipoBtnTxt, tipo === t.v && { color: "#14120F" }]}>{t.l}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
 
-            {tipo === "fuerza" && (
-              <>
+              {tipo === "fuerza" && (
+                <>
+                  <View style={m.fila}>
+                    <Campo label="PESO (KG)" value={peso} onChange={setPeso} decimal />
+                    <Campo label="SERIES" value={series} onChange={setSeries} />
+                  </View>
+                  <View style={[m.fila, { marginTop: 12 }]}>
+                    <Campo label="REPS MÍN" value={repsMin} onChange={setRepsMin} />
+                    <Campo label="REPS MÁX" value={repsMax} onChange={setRepsMax} />
+                  </View>
+                  <View style={[m.fila, { marginTop: 12 }]}>
+                    <Campo label="DESCANSO (S)" value={descanso} onChange={setDescanso} />
+                    <Campo label="INCREMENTO" value={incremento} onChange={setIncremento} decimal />
+                  </View>
+                </>
+              )}
+
+              {tipo === "tiempo" && (
                 <View style={m.fila}>
-                  <Campo label="PESO (KG)" value={peso} onChange={setPeso} decimal />
+                  <Campo label="DURACIÓN (S)" value={duracion} onChange={setDuracion} />
                   <Campo label="SERIES" value={series} onChange={setSeries} />
                 </View>
-                <View style={[m.fila, { marginTop: 12 }]}>
-                  <Campo label="REPS MÍN" value={repsMin} onChange={setRepsMin} />
-                  <Campo label="REPS MÁX" value={repsMax} onChange={setRepsMax} />
-                </View>
-                <View style={[m.fila, { marginTop: 12 }]}>
-                  <Campo label="DESCANSO (S)" value={descanso} onChange={setDescanso} />
-                  <Campo label="INCREMENTO" value={incremento} onChange={setIncremento} decimal />
-                </View>
-              </>
-            )}
+              )}
 
-            {tipo === "tiempo" && (
-              <View style={m.fila}>
-                <Campo label="DURACIÓN (S)" value={duracion} onChange={setDuracion} />
-                <Campo label="SERIES" value={series} onChange={setSeries} />
+              {tipo === "cardio" && (
+                <Campo label="DURACIÓN MÍN" value={duracion} onChange={setDuracion} />
+              )}
+
+              <View style={{ marginTop: 20, gap: 10, paddingBottom: 20 }}>
+                <Boton tono="fuerte" alto={52} onPress={guardar}>Agregar</Boton>
+                <Boton tono="fantasma" alto={44} onPress={onCerrar}>Cancelar</Boton>
               </View>
-            )}
-
-            {tipo === "cardio" && (
-              <Campo label="DURACIÓN MÍN" value={duracion} onChange={setDuracion} />
-            )}
-
-            <View style={{ marginTop: 20, gap: 10 }}>
-              <Boton tono="fuerte" alto={52} onPress={guardar}>Agregar</Boton>
-              <Boton tono="fantasma" alto={44} onPress={onCerrar}>Cancelar</Boton>
-            </View>
+            </ScrollView>
           </TouchableOpacity>
         </TouchableOpacity>
       </KeyboardAvoidingView>

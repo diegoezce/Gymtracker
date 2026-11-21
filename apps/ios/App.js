@@ -11,6 +11,7 @@ import { DiaMenuScreen } from "./src/screens/DiaMenuScreen";
 import { SesionScreen } from "./src/screens/SesionScreen";
 import { ProgresoScreen } from "./src/screens/ProgresoScreen";
 import { ResumenScreen } from "./src/screens/ResumenScreen";
+import { AjustesScreen } from "./src/screens/AjustesScreen";
 import { View, ActivityIndicator } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { C } from "./src/theme";
@@ -45,6 +46,7 @@ function RootNavigator() {
       <Stack.Screen name="Sesion" component={SesionScreen} />
       <Stack.Screen name="Progreso" component={ProgresoScreen} />
       <Stack.Screen name="Resumen" component={ResumenScreen} />
+      <Stack.Screen name="Ajustes" component={AjustesScreen} />
     </Stack.Navigator>
   );
 }

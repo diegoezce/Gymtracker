@@ -132,6 +132,9 @@ export function InicioScreen({ navigation }) {
           <View style={{ flex: 1 }}>
             <Boton tono="fantasma" alto={54} onPress={() => navigation.navigate("Progreso")}>Progreso</Boton>
           </View>
+          <View style={{ flex: 1 }}>
+            <Boton tono="fantasma" alto={54} onPress={() => navigation.navigate("Ajustes")}>Ajustes</Boton>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>

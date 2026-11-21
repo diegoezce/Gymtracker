@@ -1,7 +1,9 @@
 import { registerRootComponent } from "expo";
+import { useEffect } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { StatusBar } from "expo-status-bar";
+import * as SplashScreen from "expo-splash-screen";
 import { AppProvider, useApp } from "./src/context/AppContext";
 import { OnboardingScreen } from "./src/screens/OnboardingScreen";
 import { InicioScreen } from "./src/screens/InicioScreen";
@@ -13,10 +15,16 @@ import { View, ActivityIndicator } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { C } from "./src/theme";
 
+SplashScreen.preventAutoHideAsync();
+
 const Stack = createNativeStackNavigator();
 
 function RootNavigator() {
   const { cargando, onboardingDone } = useApp();
+
+  useEffect(() => {
+    if (!cargando) SplashScreen.hideAsync();
+  }, [cargando]);
 
   if (cargando) {
     return (

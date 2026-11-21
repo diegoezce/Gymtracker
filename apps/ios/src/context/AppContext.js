@@ -297,7 +297,17 @@ export function AppProvider({ children }) {
       return;
     }
 
-    terminarConResumen(nuevos, onNavigate);
+    // Filtrar solo los ejercicios hechos en esta sesión para el resumen
+    const hechosIds = new Set([
+      ...Object.keys(sesion.hechos),
+      ...entradas.map(([id]) => id),
+    ]);
+    const diasResumen = nuevos.map((d) => ({
+      ...d,
+      ejercicios: d.ejercicios.filter((e) => hechosIds.has(e.id)),
+    }));
+
+    terminarConResumen(diasResumen, onNavigate);
   };
 
   const editarSerie = (idx, campo, valor) => {

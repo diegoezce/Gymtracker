@@ -6,10 +6,15 @@
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/Splash.png",
+      "resizeMode": "cover",
+      "backgroundColor": "#0e0c09"
+    },
     "ios": {
       "bundleIdentifier": "me.sparkio.gymtracker",
       "supportsTablet": false,
-      "buildNumber": "5",
+      "buildNumber": "6",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }

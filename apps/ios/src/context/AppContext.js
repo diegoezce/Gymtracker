@@ -7,6 +7,9 @@ import {
   marcarSesionDia,
   registrarDuracion,
   resincronizarCompartidos,
+  ejercicio as crearEjercicio,
+  ejercicioCardio as crearEjercicioCardio,
+  ejercicioTiempo as crearEjercicioTiempo,
 } from "@gymtracker/core/domain/rutina";
 import { progresar, aprender } from "@gymtracker/core/domain/progression";
 import {
@@ -305,6 +308,18 @@ export function AppProvider({ children }) {
     setDias((prev) => actualizarCompartido(prev, ejId, cambios));
   };
 
+  const agregarEjercicioADia = (diaId, tipo, campos) => {
+    let nuevo;
+    if (tipo === "cardio") nuevo = crearEjercicioCardio(campos.nombre, campos.duracionMin);
+    else if (tipo === "tiempo") nuevo = crearEjercicioTiempo(campos.nombre, campos.duracionObjetivo, campos.series, campos.descanso);
+    else nuevo = crearEjercicio(campos.nombre, campos.peso, campos.incremento, campos.series, campos.repsMin, campos.repsMax || null, campos.descanso);
+    setDias((prev) => prev.map((d) => d.id === diaId ? { ...d, ejercicios: [...d.ejercicios, nuevo] } : d));
+  };
+
+  const eliminarEjercicioDeApp = (diaId, ejId) => {
+    setDias((prev) => prev.map((d) => d.id === diaId ? { ...d, ejercicios: d.ejercicios.filter((e) => e.id !== ejId) } : d));
+  };
+
   const completarOnboarding = () => {
     setOnboardingDone(true);
     storage.set(CLAVE_ONBOARDING, "done").catch(() => {});
@@ -356,6 +371,8 @@ export function AppProvider({ children }) {
         editarSerie,
         terminarEjercicioActual,
         actualizarEjercicio,
+        agregarEjercicioADia,
+        eliminarEjercicioDeApp,
         setSesion,
       }}
     >

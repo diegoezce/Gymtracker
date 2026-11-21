@@ -5,12 +5,22 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
+    "icon": "./assets/icon.png",
     "ios": {
       "bundleIdentifier": "me.sparkio.gymtracker",
-      "supportsTablet": false
+      "supportsTablet": false,
+      "buildNumber": "4",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "me.sparkio.gymtracker"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "d155a26c-c16a-4e18-a696-cace89ac390a"
+      }
     }
   }
 }

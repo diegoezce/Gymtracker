@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   View, Text, TouchableOpacity, ScrollView,
-  StyleSheet,
+  StyleSheet, Share, Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { fmt, fechaCorta, diasDesdeStr } from "@gymtracker/core/utils/format";
@@ -55,6 +55,15 @@ export function ProgresoScreen({ navigation }) {
   const [ejSeleccionado, setEjSeleccionado] = useState(null);
   const { estaSemana, esteMes } = contarSesiones(dias);
 
+  const exportarDatos = async () => {
+    try {
+      const json = JSON.stringify({ version: 1, exportado: new Date().toISOString(), dias }, null, 2);
+      await Share.share({ message: json, title: "IronWorks - mis datos" });
+    } catch {
+      Alert.alert("Error", "No se pudo exportar los datos.");
+    }
+  };
+
   if (ejSeleccionado) {
     return (
       <SafeAreaView style={s.root}>
@@ -75,6 +84,10 @@ export function ProgresoScreen({ navigation }) {
         {esteMes > 0 && (
           <Text style={s.stats}>{estaSemana} sesiones esta semana · {esteMes} este mes</Text>
         )}
+
+        <TouchableOpacity onPress={exportarDatos} style={s.exportBtn} activeOpacity={0.8}>
+          <Text style={s.exportTxt}>Exportar mis datos</Text>
+        </TouchableOpacity>
 
         {dias.map((dia) => (
           <View key={dia.id} style={{ marginTop: 20 }}>
@@ -135,6 +148,11 @@ const s = StyleSheet.create({
   ejNombre: { fontSize: 16, fontWeight: "600", color: C.hueso, flex: 1 },
   ejPeso: { fontFamily: MONO, fontSize: 14, color: C.sodio, flexShrink: 0 },
   ejUltima: { fontFamily: MONO, fontSize: 11, color: C.gris, marginTop: 4 },
+  exportBtn: {
+    borderWidth: 1, borderColor: C.linea, borderRadius: 4,
+    paddingVertical: 14, alignItems: "center", marginBottom: 24,
+  },
+  exportTxt: { fontFamily: MONO, fontSize: 13, color: C.gris, letterSpacing: 0.5 },
 });
 
 const d = StyleSheet.create({

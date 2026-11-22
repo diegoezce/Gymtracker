@@ -56,84 +56,58 @@ punto 1 del texto.
 
 ## Texto para pegar en Notas
 
-El campo admite **4000 caracteres**. Esto ocupa 3617, así que quedan 383 de
+El campo admite **4000 caracteres**. Esto ocupa 3599, así que quedan 401 de
 margen: si agregás algo, medilo antes (`wc -c`).
 
+**Va a propósito sin cortes de línea**: un párrafo por renglón, y cada viñeta y
+cada paso en un solo renglón. El `textarea` de App Store Connect envuelve solo,
+así que si lo cortás a mano queda con saltos en mitad de las oraciones. No lo
+reformatees al pegarlo.
+
 ```
-Thank you for reviewing IronWorks. The requested information follows, in the
-same order.
+Thank you for reviewing IronWorks. The requested information follows, in the same order.
 
 NO ACCOUNT OR LOGIN IS REQUIRED, and the app requests no permissions.
 
 1. SCREEN RECORDING
-Attached: a recording from a physical device on the latest iOS. It begins with
-launching the app and shows the typical flow: onboarding, starting a training
-day, logging a set, the automatic weight suggestion for the next set, and the
-session summary.
+Attached: a recording from a physical device on the latest iOS. It begins with launching the app and shows the typical flow: onboarding, starting a training day, logging a set, the automatic weight suggestion for the next set, and the session summary.
 
-The three items you list do not exist in this app, so they are not in the
-recording:
-- No account registration, login or deletion: the app has no accounts and no
-  server. All data stays on the device.
-- No user-generated content shared with anyone. Routines and notes stay on the
-  user's own device and are never uploaded or visible to others. There are no
-  social, sharing or messaging features, so reporting and blocking do not
-  apply.
-- No paid content and no in-app purchases. The app is free and fully
-  functional.
+The three items you list do not exist in this app, so they are not in the recording:
+
+- No account registration, login or deletion: the app has no accounts and no server. All data stays on the device.
+- No user-generated content shared with anyone. Routines and notes stay on the user's own device and are never uploaded or visible to others. There are no social, sharing or messaging features, so reporting and blocking do not apply.
+- No paid content and no in-app purchases. The app is free and fully functional.
 
 2. PURPOSE AND TARGET AUDIENCE
-IronWorks is a strength-training log for people who train with weights and
-follow a structured routine.
+IronWorks is a strength-training log for people who train with weights and follow a structured routine.
 
-The problem: progressive overload means deciding, session after session and
-for every exercise, whether to add weight, hold it or back off. People do this
-from memory or in a spreadsheet, and end up either stalling for months or
-jumping too fast.
+The problem: progressive overload means deciding, session after session and for every exercise, whether to add weight, hold it or back off. People do this from memory or in a spreadsheet, and end up either stalling for months or jumping too fast.
 
-The value: the user records the reps performed and how many were left in
-reserve, and the app computes the load for the next set and the next session
-from that history. It also warns when an exercise was already trained on
-another day of the routine within the last 7 days.
+The value: the user records the reps performed and how many were left in reserve, and the app computes the load for the next set and the next session from that history. It also warns when an exercise was already trained on another day of the routine within the last 7 days.
 
 3. SETUP AND ACCESS TO MAIN FEATURES
 No credentials, sample files or configuration are required.
 
-a. On first launch the app shows a short introduction and creates a starter
-   routine, so there is no empty state. Tap "Empezar a entrenar".
+a. On first launch the app shows a short introduction and creates a starter routine, so there is no empty state. Tap "Empezar a entrenar".
 b. On the home screen, tap "Empezar" to begin the suggested training day.
 c. Tap any exercise in the list.
-d. Enter the reps, choose an option under "¿CUÁNTO TE SOBRÓ?" (how many reps
-   were left), and tap "Guardar serie".
-e. From the second set on, a suggested weight appears below the weight card
-   with the reason for it. Tapping it applies that weight.
+d. Enter the reps, choose an option under "¿CUÁNTO TE SOBRÓ?" (how many reps were left), and tap "Guardar serie".
+e. From the second set on, a suggested weight appears below the weight card with the reason for it. Tapping it applies that weight.
 f. After the sets, tap "Terminar sesión" for the day's summary.
 g. Routines are editable at any time from "Ajustes".
 
 4. EXTERNAL SERVICES, TOOLS AND PLATFORMS
 None. The app makes no network requests whatsoever.
 
-No data providers, authentication services, payment processors, AI services,
-analytics, crash reporting, remote configuration or over-the-air updates. The
-app contains no networking code; all computation, including the weight
-progression logic, runs on the device. Data is stored locally using the
-system's standard on-device storage.
+No data providers, authentication services, payment processors, AI services, analytics, crash reporting, remote configuration or over-the-air updates. The app contains no networking code; all computation, including the weight progression logic, runs on the device. Data is stored locally using the system's standard on-device storage.
 
 5. REGIONAL DIFFERENCES
-None. The app behaves identically in every region: same features, same
-content, same offline behavior. It does not use location and has no
-region-restricted functionality. The interface is in Spanish only, its single
-supported language in all regions.
+None. The app behaves identically in every region: same features, same content, same offline behavior. It does not use location and has no region-restricted functionality. The interface is in Spanish only, its single supported language in all regions.
 
 6. REGULATED INDUSTRY AND THIRD-PARTY MATERIAL
-Not applicable. IronWorks is a personal training log. It provides no medical,
-diagnostic or therapeutic advice, makes no health claims, does not read or
-write Apple Health data, and is not intended to treat or prevent any
-condition. The weight suggestions are arithmetic over what the user recorded.
+Not applicable. IronWorks is a personal training log. It provides no medical, diagnostic or therapeutic advice, makes no health claims, does not read or write Apple Health data, and is not intended to treat or prevent any condition. The weight suggestions are arithmetic over what the user recorded.
 
-It contains no protected third-party material: no licensed exercise database,
-no third-party video, images or text, and no branded content. Exercise names
-are generic terms and all routine content is created by the user.
+It contains no protected third-party material: no licensed exercise database, no third-party video, images or text, and no branded content. Exercise names are generic terms and all routine content is created by the user.
 ```
 
 ### Si el build tiene compra integrada

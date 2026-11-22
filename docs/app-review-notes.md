@@ -47,6 +47,17 @@ Alcanza con unos 90 segundos:
    demuestra que la app hace algo, y es lo que el revisor tiene que ver sí o sí.
 6. Completar el ejercicio y terminar la sesión hasta el resumen.
 
+**La grabación hecha (2026-11-22) cubre además** de ese mínimo: agregar y quitar
+ejercicios, la pantalla de Progreso, y "Exportar mis datos" — que abre el share
+sheet del sistema y pega el JSON en Notas. Eso suma funcionalidad demostrada
+para 4.2, pero hay que avisarlo en las notas: la grabación **se sale de la app**
+un momento, y sin aviso parece una grabación cortada. Por eso el punto 1 del
+texto lo nombra.
+
+> El botón de exportar está en **Progreso**, no en Ajustes
+> (`ProgresoScreen.js:58`). Ajustes sólo edita ejercicios. Si las notas dijeran
+> "Ajustes", el revisor lo busca ahí, no lo encuentra, y eso es otro rechazo.
+
 Las tres cosas que Apple pide incluir *si existen* —registro y borrado de
 cuenta, contenido generado por usuarios, contenido pago— **no existen en esta
 app**. No hay que grabarlas, pero sí decirlo en las notas, que es lo que hace el
@@ -56,7 +67,7 @@ punto 1 del texto.
 
 ## Texto para pegar en Notas
 
-El campo admite **4000 caracteres**. Esto ocupa 3599, así que quedan 401 de
+El campo admite **4000 caracteres**. Esto ocupa 3890, así que quedan 110 de
 margen: si agregás algo, medilo antes (`wc -c`).
 
 **Va a propósito sin cortes de línea**: un párrafo por renglón, y cada viñeta y
@@ -70,7 +81,7 @@ Thank you for reviewing IronWorks. The requested information follows, in the sam
 NO ACCOUNT OR LOGIN IS REQUIRED, and the app requests no permissions.
 
 1. SCREEN RECORDING
-Attached: a recording from a physical device on the latest iOS. It begins with launching the app and shows the typical flow: onboarding, starting a training day, logging a set, the automatic weight suggestion for the next set, and the session summary.
+Attached: a recording from a physical device on the latest iOS. It begins with launching the app and shows the typical flow: onboarding, starting a training day, logging a set, the automatic weight suggestion for the next set, and the session summary. It then shows adding and removing exercises, the progress screen, and the data export; it briefly leaves the app to paste the exported JSON into Notes.
 
 The three items you list do not exist in this app, so they are not in the recording:
 
@@ -95,6 +106,7 @@ d. Enter the reps, choose an option under "¿CUÁNTO TE SOBRÓ?" (how many reps 
 e. From the second set on, a suggested weight appears below the weight card with the reason for it. Tapping it applies that weight.
 f. After the sets, tap "Terminar sesión" for the day's summary.
 g. Routines are editable at any time from "Ajustes".
+h. On the progress screen, "Exportar mis datos" shares the whole history as JSON through the system share sheet, with no account involved.
 
 4. EXTERNAL SERVICES, TOOLS AND PLATFORMS
 None. The app makes no network requests whatsoever.

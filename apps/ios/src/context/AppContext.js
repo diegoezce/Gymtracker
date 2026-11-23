@@ -314,6 +314,10 @@ export function AppProvider({ children }) {
     setSesion(editarSerieEnSesion(sesion, idx, campo, valor));
   };
 
+  const importarDiasDesdeBackup = (diasImportados) => {
+    setDias(diasImportados);
+  };
+
   const actualizarEjercicio = (ejId, cambios) => {
     setDias((prev) => actualizarCompartido(prev, ejId, cambios));
   };
@@ -380,6 +384,7 @@ export function AppProvider({ children }) {
         reabrirEjercicio,
         editarSerie,
         terminarEjercicioActual,
+        importarDiasDesdeBackup,
         actualizarEjercicio,
         agregarEjercicioADia,
         eliminarEjercicioDeApp,

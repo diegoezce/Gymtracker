@@ -4,6 +4,8 @@ import {
   StyleSheet, Share, Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import * as DocumentPicker from "expo-document-picker";
+import * as FileSystem from "expo-file-system";
 import { fmt, fechaCorta, diasDesdeStr } from "@gymtracker/core/utils/format";
 import { contarSesiones } from "@gymtracker/core/domain/inicio";
 import { useApp } from "../context/AppContext";
@@ -51,7 +53,7 @@ function HistorialEjercicio({ ej, onCerrar }) {
 }
 
 export function ProgresoScreen({ navigation }) {
-  const { dias } = useApp();
+  const { dias, importarDiasDesdeBackup } = useApp();
   const [ejSeleccionado, setEjSeleccionado] = useState(null);
   const { estaSemana, esteMes } = contarSesiones(dias);
 
@@ -61,6 +63,29 @@ export function ProgresoScreen({ navigation }) {
       await Share.share({ message: json, title: "IronWorks - mis datos" });
     } catch {
       Alert.alert("Error", "No se pudo exportar los datos.");
+    }
+  };
+
+  const importarDatos = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({ type: "application/json", copyToCacheDirectory: true });
+      if (result.canceled) return;
+      const contenido = await FileSystem.readAsStringAsync(result.assets[0].uri);
+      const datos = JSON.parse(contenido);
+      if (!datos.dias || !Array.isArray(datos.dias)) {
+        Alert.alert("Archivo inválido", "El archivo no tiene el formato correcto.");
+        return;
+      }
+      Alert.alert(
+        "Importar datos",
+        `Se van a reemplazar tus datos actuales con el backup del ${new Date(datos.exportado).toLocaleDateString("es-AR")}. ¿Continuar?`,
+        [
+          { text: "Cancelar", style: "cancel" },
+          { text: "Importar", style: "destructive", onPress: () => importarDiasDesdeBackup(datos.dias) },
+        ]
+      );
+    } catch {
+      Alert.alert("Error", "No se pudo leer el archivo.");
     }
   };
 
@@ -85,9 +110,14 @@ export function ProgresoScreen({ navigation }) {
           <Text style={s.stats}>{estaSemana} sesiones esta semana · {esteMes} este mes</Text>
         )}
 
-        <TouchableOpacity onPress={exportarDatos} style={s.exportBtn} activeOpacity={0.8}>
-          <Text style={s.exportTxt}>Exportar mis datos</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: "row", gap: 10, marginBottom: 24 }}>
+          <TouchableOpacity onPress={exportarDatos} style={[s.exportBtn, { flex: 1 }]} activeOpacity={0.8}>
+            <Text style={s.exportTxt}>Exportar</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={importarDatos} style={[s.exportBtn, { flex: 1 }]} activeOpacity={0.8}>
+            <Text style={s.exportTxt}>Importar</Text>
+          </TouchableOpacity>
+        </View>
 
         {dias.map((dia) => (
           <View key={dia.id} style={{ marginTop: 20 }}>
